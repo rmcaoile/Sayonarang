@@ -41,17 +41,20 @@ dependencies:
   cloud_firestore: ^4.17.3
   firebase_auth: ^4.17.8
   qr_flutter: ^4.1.0
-  qr_bar_code_scanner_dialog: ^0.0.5
+  mobile_scanner: ^7.3.0
   image_picker: ^1.0.8
   firebase_storage: ^11.6.9
-  multiple_images_picker: ^1.0.1
   carousel_slider: ^4.2.1
   photo_view: ^0.15.0
-  screenshot: ^2.5.0
+  screenshot: ^3.0.0
   permission_handler: ^11.3.1
-  image_gallery_saver: ^2.0.3
-  telephony: ^0.2.0
+  image_gallery_saver_plus: ^5.1.1
+  url_launcher: ^6.3.3
   flutter_launcher_icons: ^0.13.1
+
+dependency_overrides:
+  flutter_plugin_android_lifecycle: ^2.0.33
+  image_picker_android: 0.8.13+14
 
 dev_dependencies:
   flutter_test:

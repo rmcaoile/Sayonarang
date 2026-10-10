@@ -4,7 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:screenshot/screenshot.dart';
 import 'dart:typed_data';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
 
 class QrCodeScreen extends StatelessWidget {
   final String donationId;
@@ -30,7 +30,7 @@ class QrCodeScreen extends StatelessWidget {
       }
 
       if (status.isGranted) {
-        final result = await ImageGallerySaver.saveImage(uint8list);
+        final result = await ImageGallerySaverPlus.saveImage(uint8list);
         if (result['isSuccess']) {
           print('Image Saved to Gallery');
         } else {

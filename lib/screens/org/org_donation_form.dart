@@ -8,8 +8,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import "package:firebase_auth/firebase_auth.dart";
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:qr_bar_code_scanner_dialog/qr_bar_code_scanner_dialog.dart';
-import 'package:telephony/telephony.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 
 // TODO: Add loading state for saving and loading image
@@ -42,8 +42,6 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
   String? _driveTitle;
   bool get isViewMode => true;
   final _formKey = GlobalKey<FormState>();
-  final _qrBarCodeScannerDialogPlugin = QrBarCodeScannerDialog();
-  final Telephony telephony = Telephony.instance;
 
   @override
   void initState() {
@@ -263,18 +261,45 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
     );
   }
 
-  // TODO
   Future<void> _sendCompletionNotification() async {
-    final bool? result = await telephony.requestPhoneAndSmsPermissions;
+    final String donorContactNum = _contactNumController.text;
+    final String message =
+        "Your donation has been sent to Donation Drive: $_driveTitle. Thank you for your contribution!";
 
-    if (result != null && result) {
-      final String donorContactNum = _contactNumController.text;
-      final String message =
-          "Your donation has been sent to Donation Drive: $_driveTitle. Thank you for your contribution!";
-
-      telephony.sendSms(to: donorContactNum, message: message);
-      print('SMS sent successfully');
+    final Uri smsUri = Uri.parse('smsto:$donorContactNum');
+    if (await canLaunchUrl(smsUri)) {
+      await launchUrl(smsUri);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open SMS app')),
+      );
     }
+  }
+
+  void _startQrScan() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          surfaceTintColor: Colors.transparent,
+          content: SizedBox(
+            width: double.infinity,
+            height: 300,
+            child: MobileScanner(
+              onDetect: (BarcodeCapture capture) {
+                final String code =
+                    capture.barcodes.first.rawValue ?? '';
+                if (code.isNotEmpty) {
+                  Navigator.of(context).pop();
+                  _handleQRScan(code);
+                }
+              },
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _handleQRScan(String data) {
@@ -458,11 +483,7 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
       onPressed = () => _showDonationStatusModal("completed");
     } else if (_status == "confirmed" && _mode == "Drop-off") {
       buttonText = "Complete";
-      onPressed = () => _qrBarCodeScannerDialogPlugin.getScannedQrBarCode(
-          context: context,
-          onCode: (code) {
-            _handleQRScan(code!);
-          });
+      onPressed = () => _startQrScan();
     }
 
     return Scaffold(

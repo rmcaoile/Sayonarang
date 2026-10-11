@@ -1,11 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/donation_model.dart';
 import '../../providers/admin_provider.dart';
+import '../../providers/donation_provider.dart';
+import '../../screens/shared/image_viewer.dart';
+import '../../storage_config.dart';
 
-class DonationDetailScreen extends StatelessWidget {
+class DonationDetailScreen extends StatefulWidget {
   final Donation donation;
   final String userName;
   final String userRole;
@@ -16,6 +21,104 @@ class DonationDetailScreen extends StatelessWidget {
     required this.userName,
     required this.userRole,
   }) : super(key: key);
+
+  @override
+  State<DonationDetailScreen> createState() => _DonationDetailScreenState();
+}
+
+class _DonationDetailScreenState extends State<DonationDetailScreen> {
+  String? _photoDownloadURL;
+  bool _isLoadingImage = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDownloadURL();
+  }
+
+  Future<void> _loadDownloadURL() async {
+    if (widget.donation.photo != '' && widget.donation.photo.isNotEmpty) {
+      final downloadURL = await context
+          .read<DonationProvider>()
+          .fetchDownloadURLForImage(widget.donation.photo);
+      if (mounted) {
+        setState(() {
+          _photoDownloadURL = downloadURL;
+          _isLoadingImage = false;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoadingImage = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildImageContainer() {
+    if (_isLoadingImage) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0),
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_photoDownloadURL == null || _photoDownloadURL!.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0),
+        child: Center(
+          child: Text(
+            'No image available',
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Image",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => ShowFullImage(
+                  image: _photoDownloadURL!,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            height: 200,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              image: DecorationImage(
+                image: StorageConfig.useFirebaseStorage
+                    ? NetworkImage(_photoDownloadURL!)
+                    : MemoryImage(base64Decode(_photoDownloadURL!))
+                        as ImageProvider,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,9 +151,9 @@ class DonationDetailScreen extends StatelessWidget {
                     const SizedBox(height: 10),
                     Center(
                       child: Text(
-                        userRole == 'Donor'
-                            ? 'Organization: $userName'
-                            : 'Donor: $userName',
+                        widget.userRole == 'Donor'
+                            ? 'Organization: ${widget.userName}'
+                            : 'Donor: ${widget.userName}',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -58,7 +161,7 @@ class DonationDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 15),
-                    _buildStatusText(donation.status),
+                    _buildStatusText(widget.donation.status),
                     const SizedBox(height: 15),
                     const Text(
                       'Donation Drive:',
@@ -71,7 +174,7 @@ class DonationDetailScreen extends StatelessWidget {
                       children: [
                         const SizedBox(width: 25),
                         FutureBuilder<String?>(
-                          future: adminProvider.getTitleName(donation.driveId),
+                          future: adminProvider.getTitleName(widget.donation.driveId),
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==
                                 ConnectionState.waiting) {
@@ -116,7 +219,7 @@ class DonationDetailScreen extends StatelessWidget {
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: donation.categories.map((category) {
+                      children: widget.donation.categories.map((category) {
                         return Row(
                           children: [
                             const SizedBox(width: 25),
@@ -132,7 +235,7 @@ class DonationDetailScreen extends StatelessWidget {
                       }).toList(),
                     ),
                     const SizedBox(height: 15),
-                    if (donation.mode == 'Pick-up') ...[
+                    if (widget.donation.mode == 'Pick-up') ...[
                       const Text(
                         'Addresses:',
                         style: TextStyle(
@@ -142,7 +245,7 @@ class DonationDetailScreen extends StatelessWidget {
                       ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: donation.addresses.map((address) {
+                        children: widget.donation.addresses.map((address) {
                           return Row(
                             children: [
                               const SizedBox(width: 25),
@@ -170,7 +273,7 @@ class DonationDetailScreen extends StatelessWidget {
                       children: [
                         const SizedBox(width: 25),
                         Text(
-                          donation.mode,
+                          widget.donation.mode,
                           style: const TextStyle(
                             fontSize: 16,
                             color: Color(0xFF666666),
@@ -190,7 +293,7 @@ class DonationDetailScreen extends StatelessWidget {
                       children: [
                         const SizedBox(width: 25),
                         Text(
-                          donation.weight.toString(),
+                          widget.donation.weight.toString(),
                           style: const TextStyle(
                             fontSize: 16,
                             color: Color(0xFF666666),
@@ -199,7 +302,7 @@ class DonationDetailScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 15),
-                    if (donation.mode == 'Pick-up') ...[
+                    if (widget.donation.mode == 'Pick-up') ...[
                       const Text(
                         'Contact Number:',
                         style: TextStyle(
@@ -211,7 +314,7 @@ class DonationDetailScreen extends StatelessWidget {
                         children: [
                           const SizedBox(width: 25),
                           Text(
-                            donation.contactNum,
+                            widget.donation.contactNum,
                             style: const TextStyle(
                               fontSize: 16,
                               color: Color(0xFF666666),
@@ -232,7 +335,7 @@ class DonationDetailScreen extends StatelessWidget {
                       children: [
                         const SizedBox(width: 25),
                         Text(
-                          DateFormat('MMMM dd, yyyy').format(donation.date),
+                          DateFormat('MMMM dd, yyyy').format(widget.donation.date),
                           style: const TextStyle(
                             fontSize: 16,
                             color: Color(0xFF666666),
@@ -241,6 +344,7 @@ class DonationDetailScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 15),
+                    _buildImageContainer(),
                   ],
                 ),
               ),

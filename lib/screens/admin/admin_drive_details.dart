@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +9,9 @@ import '../../models/donation_model.dart';
 import '../../models/drive_model.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/donation_provider.dart';
+import '../../providers/drive_provider.dart';
+import '../../screens/shared/image_slider.dart';
+import '../../storage_config.dart';
 import 'admin_donation_details.dart';
 
 class DriveScreen extends StatefulWidget {
@@ -62,7 +68,7 @@ class _DriveScreenState extends State<DriveScreen> {
 }
 
 // Details screen of drive
-class DriveDetailScreen extends StatelessWidget {
+class DriveDetailScreen extends StatefulWidget {
   final Drive drive;
   final String userName;
 
@@ -71,6 +77,125 @@ class DriveDetailScreen extends StatelessWidget {
     required this.drive,
     required this.userName,
   }) : super(key: key);
+
+  @override
+  State<DriveDetailScreen> createState() => _DriveDetailScreenState();
+}
+
+class _DriveDetailScreenState extends State<DriveDetailScreen> {
+  List<String> _photosDownloadURLs = [];
+  bool _isLoadingImages = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDownloadURLs();
+  }
+
+  Future<void> _loadDownloadURLs() async {
+    if (widget.drive.photos.isNotEmpty) {
+      final downloadURLs = await context
+          .read<DriveProvider>()
+          .fetchDownloadURLsForImages(widget.drive.photos);
+      if (mounted) {
+        setState(() {
+          _photosDownloadURLs = downloadURLs;
+          _isLoadingImages = false;
+        });
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoadingImages = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildImageGrid() {
+    if (_isLoadingImages) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0),
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_photosDownloadURLs.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.0),
+        child: Center(
+          child: Text(
+            'No images available',
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              color: Colors.grey,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Images",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12.0),
+              color: Colors.grey[200],
+            ),
+            height: 200,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4,
+                  crossAxisSpacing: 4.0,
+                  mainAxisSpacing: 4.0,
+                ),
+                itemCount: _photosDownloadURLs.length,
+                itemBuilder: (context, index) {
+                  final image = _photosDownloadURLs[index];
+                  return InkWell(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => SliderShowFullmages(
+                            listImagesModel: _photosDownloadURLs,
+                            current: index,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(
+                          image: StorageConfig.useFirebaseStorage
+                              ? NetworkImage(image)
+                              : MemoryImage(base64Decode(image))
+                                  as ImageProvider,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],      
+      );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +225,7 @@ class DriveDetailScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    drive.title,
+                    widget.drive.title,
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -108,7 +233,7 @@ class DriveDetailScreen extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'By: $userName',
+                    'By: ${widget.userName}',
                     style: const TextStyle(
                       fontSize: 16,
                       color: Color(0xFF666666),
@@ -118,27 +243,6 @@ class DriveDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 16),
-                      // const Text(
-                      //   'Organization',
-                      //   style: TextStyle(
-                      //     fontSize: 18,
-                      //     fontWeight: FontWeight.bold,
-                      //   ),
-                      // ),
-                      // const SizedBox(height: 8),
-                      // Row(
-                      //   children: [
-                      //     const SizedBox(width: 15),
-                      //     Text(
-                      //       userName,
-                      //       style: const TextStyle(
-                      //         fontSize: 16,
-                      //         color: Color(0xFF666666),
-                      //       ),
-                      //     ),
-                      //   ],
-                      // ),
-                      // const SizedBox(height: 15),
                       const Text(
                         'Description:',
                         style: TextStyle(
@@ -150,7 +254,7 @@ class DriveDetailScreen extends StatelessWidget {
                         children: [
                           const SizedBox(width: 15),
                           Text(
-                            drive.description,
+                            widget.drive.description,
                             style: const TextStyle(
                               fontSize: 16,
                               color: Color(0xFF666666),
@@ -171,7 +275,8 @@ class DriveDetailScreen extends StatelessWidget {
                         children: [
                           const SizedBox(width: 15),
                           Text(
-                            DateFormat('MMMM dd, yyyy').format(drive.endDate),
+                            DateFormat('MMMM dd, yyyy')
+                                .format(widget.drive.endDate),
                             style: const TextStyle(
                               fontSize: 16,
                               color: Color(0xFF666666),
@@ -180,6 +285,7 @@ class DriveDetailScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 20),
+                      _buildImageGrid(),
                     ],
                   ),
                 ],

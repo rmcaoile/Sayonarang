@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:donation_app/models/donate_data.dart';
 import 'package:donation_app/providers/donor_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:donation_app/screens/donor/donor_qrcode.dart';
+import 'package:donation_app/screens/shared/image_viewer.dart';
+import 'package:donation_app/storage_config.dart';
 
 class DonationDetailScreen extends StatelessWidget {
   final DonateData donation;
@@ -217,10 +220,27 @@ class DonationDetailScreen extends StatelessWidget {
                     if (donation.photo.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Image.network(
-                          donation.photo,
+                        child: SizedBox(
                           height: 200,
-                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => ShowFullImage(
+                                    image: donation.photo,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Image(
+                              image: StorageConfig.useFirebaseStorage
+                                  ? NetworkImage(donation.photo)
+                                  : MemoryImage(base64Decode(donation.photo))
+                                      as ImageProvider,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
                       ),
                     if (donation.mode == "Drop-off")

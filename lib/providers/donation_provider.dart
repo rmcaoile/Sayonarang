@@ -4,6 +4,9 @@ import 'package:donation_app/models/donation_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
+import 'package:donation_app/utils/image_compression.dart';
 
 class DonationProvider with ChangeNotifier {
   late FirebaseDonationAPI firebaseService;
@@ -116,40 +119,56 @@ class DonationProvider with ChangeNotifier {
 
   Future<String> uploadFile(File file) async {
     try {
-      // get reference to firebase storage
-      final storageRef = FirebaseStorage.instance.ref();
+      if (StorageConfig.useFirebaseStorage) {
+        // get reference to firebase storage
+        final storageRef = FirebaseStorage.instance.ref();
 
-      // get filename of the image
-      final fileName = file.path.split("/").last;
-      final timestamp = DateTime.now().microsecondsSinceEpoch;
+        // get filename of the image
+        final fileName = file.path.split("/").last;
+        final timestamp = DateTime.now().microsecondsSinceEpoch;
 
-      // define the path in the storage
-      final uploadRef = storageRef.child("images/$timestamp-$fileName");
-      await uploadRef.putFile(file);
-      print('Successfully uploaded file');
-      return '$timestamp-$fileName';
+        // define the path in the storage
+        final uploadRef = storageRef.child("images/$timestamp-$fileName");
+        await uploadRef.putFile(file);
+        print('Successfully uploaded file');
+        return '$timestamp-$fileName';
+      }
+
+      // base64 in Firestore
+      final compressedBytes = await ImageCompressionUtil.compressImage(file);
+      final base64Image = base64Encode(compressedBytes);
+      print('Successfully compressed and converted file to base64');
+      return base64Image;
     } catch (e) {
       print(e);
-      return 'error';
+      return '';
     }
   }
 
   Future<void> deleteFile(String fileUrl) async {
-    try {
-      final storageRef = FirebaseStorage.instance.ref();
-      final fileRef = storageRef.storage.refFromURL(fileUrl);
-      await fileRef.delete();
-      print('Successfully deleted file: $fileUrl');
-    } catch (e) {
-      print(e);
+    if (StorageConfig.useFirebaseStorage) {
+      try {
+        final storageRef = FirebaseStorage.instance.ref();
+        final fileRef = storageRef.storage.refFromURL(fileUrl);
+        await fileRef.delete();
+        print('Successfully deleted file: $fileUrl');
+      } catch (e) {
+        print(e);
+      }
+      return;
     }
+    // 
   }
 
-  Future<String> fetchDownloadURLForImage(String filename) async {
-    String downloadURL = await FirebaseStorage.instance
-        .ref()
-        .child('images/${filename}')
-        .getDownloadURL();
-    return downloadURL;
+  Future<String> fetchDownloadURLForImage(String photo) async {
+    if (StorageConfig.useFirebaseStorage) {
+      String downloadURL = await FirebaseStorage.instance
+          .ref()
+          .child('images/${photo}')
+          .getDownloadURL();
+      return downloadURL;
+    }
+    // base64 string stored in Firestore; return as-is
+    return photo;
   }
 }

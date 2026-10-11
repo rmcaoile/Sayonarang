@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
 import "package:firebase_auth/firebase_auth.dart";
 import "package:donation_app/models/user_model.dart" as user_model;
 
@@ -112,12 +114,23 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
   Future<void> _loadDownloadURLs() async {
     if (widget.mode == "edit" || widget.mode == "view") {
       if (_photo != '') {
-        String downloadURL = await context
-            .read<DonationProvider>()
-            .fetchDownloadURLForImage(_photo);
-        setState(() {
-          _photoDownloadURL = downloadURL;
-        });
+        if (StorageConfig.useFirebaseStorage) {
+          final downloadURL = await context
+              .read<DonationProvider>()
+              .fetchDownloadURLForImage(_photo);
+          setState(() {
+            _photoDownloadURL = downloadURL;
+          });
+        } else {
+          try {
+            base64Decode(_photo);
+            setState(() {
+              _photoDownloadURL = _photo;
+            });
+          } catch (e) {
+            print('Invalid base64 image data: $e');
+          }
+        }
       }
     }
   }
@@ -282,7 +295,11 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                       borderRadius: BorderRadius.circular(8),
                       image: DecorationImage(
                         image: _photoDownloadURL != ''
-                            ? NetworkImage(_photoDownloadURL)
+                            ? (StorageConfig.useFirebaseStorage
+                                ? NetworkImage(_photoDownloadURL)
+                                : MemoryImage(
+                                        base64Decode(_photoDownloadURL))
+                                    as ImageProvider<Object>)
                             : FileImage(_selectedPhoto!)
                                 as ImageProvider<Object>,
                         fit: BoxFit.cover,

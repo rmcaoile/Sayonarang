@@ -11,6 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
 
 // TODO: Add loading state for saving and loading image
 
@@ -89,12 +90,23 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
 
   Future<void> _loadDownloadURLs() async {
     if (_photo != '') {
-      String downloadURL = await context
-          .read<DonationProvider>()
-          .fetchDownloadURLForImage(_photo);
-      setState(() {
-        _photoDownloadURL = downloadURL;
-      });
+      if (StorageConfig.useFirebaseStorage) {
+        final downloadURL = await context
+            .read<DonationProvider>()
+            .fetchDownloadURLForImage(_photo);
+        setState(() {
+          _photoDownloadURL = downloadURL;
+        });
+      } else {
+        try {
+          base64Decode(_photo);
+          setState(() {
+            _photoDownloadURL = _photo;
+          });
+        } catch (e) {
+          print('Invalid base64 image data in donation: $e');
+        }
+      }
     }
   }
 
@@ -364,7 +376,10 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
                   image: DecorationImage(
-                    image: NetworkImage(_photoDownloadURL),
+                    image: StorageConfig.useFirebaseStorage
+                        ? NetworkImage(_photoDownloadURL)
+                        : MemoryImage(base64Decode(_photoDownloadURL))
+                            as ImageProvider,
                     fit: BoxFit.cover,
                   ),
                 ),

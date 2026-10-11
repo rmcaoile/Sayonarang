@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:donation_app/storage_config.dart';
 
 class FirebaseAdminAPI {
   // A class that provides methods to interact with Firebase Firestore for friend-related operations.
@@ -99,15 +100,19 @@ class FirebaseAdminAPI {
   }
 
   // Retrieve image proof of org
-  Future<String?> getProofImageUrl(String filename) async {
-    try {
-      final storageRef = FirebaseStorage.instance.ref();
-      final imageRef = storageRef.child("proof/$filename");
-      return await imageRef.getDownloadURL();
-    } catch (e) {
-      print("Failed to retrieve image: $e");
-      return null;
+  Future<String?> getProofImageUrl(String photo) async {
+    if (StorageConfig.useFirebaseStorage) {
+      try {
+        final storageRef = FirebaseStorage.instance.ref();
+        final imageRef = storageRef.child("proof/$photo");
+        return await imageRef.getDownloadURL();
+      } catch (e) {
+        print("Failed to retrieve image: $e");
+        return null;
+      }
     }
+    // base64 string stored in Firestore; return as-is
+    return photo;
   }
 
   // Retrieve drive name by id

@@ -10,6 +10,8 @@ import "package:provider/provider.dart";
 import "package:cloud_firestore/cloud_firestore.dart";
 
 // TODO: Add loading state for saving and loading images
+import 'dart:convert';
+import '../../storage_config.dart';
 // TODO: Add snackbar to show successfully edited or successfully saved
 
 class DonorDriveFormPage extends StatefulWidget {
@@ -84,12 +86,27 @@ class DonorDriveFormPageState extends State<DonorDriveFormPage> {
 
   Future<void> _loadDownloadURLs() async {
     if (widget.mode == "edit" || widget.mode == "view") {
-      List<String> downloadURLs = await context
-          .read<DriveProvider>()
-          .fetchDownloadURLsForImages(_photos);
-      setState(() {
-        _photosDownloadURLs = downloadURLs;
-      });
+      if (StorageConfig.useFirebaseStorage) {
+        List<String> downloadURLs = await context
+            .read<DriveProvider>()
+            .fetchDownloadURLsForImages(_photos);
+        setState(() {
+          _photosDownloadURLs = downloadURLs;
+        });
+      } else {
+        List<String> validPhotos = [];
+        for (String photo in _photos) {
+          try {
+            base64Decode(photo);
+            validPhotos.add(photo);
+          } catch (e) {
+            print('Invalid base64 image data: $e');
+          }
+        }
+        setState(() {
+          _photosDownloadURLs = validPhotos;
+        });
+      }
     }
   }
 
@@ -229,8 +246,12 @@ class DonorDriveFormPageState extends State<DonorDriveFormPage> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     image: DecorationImage(
-                                      image:
-                                          NetworkImage(image) as ImageProvider,
+                                      image: StorageConfig.useFirebaseStorage
+                                          ? NetworkImage(image)
+                                              as ImageProvider
+                                          : MemoryImage(
+                                              base64Decode(image))
+                                              as ImageProvider,
                                       fit: BoxFit.cover,
                                     ),
                                   ),

@@ -1,4 +1,6 @@
 import 'package:donation_app/screens/shared/image_viewer.dart';
+import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
@@ -206,12 +208,19 @@ class ViewOrgDetails extends StatelessWidget {
                                     ),
                                   );
                                 },
-                                child: Image.network(
-                                  imageUrl,
-                                  width: 250,
-                                  height: 250,
-                                  fit: BoxFit.cover,
-                                ),
+                                child: StorageConfig.useFirebaseStorage
+                                    ? Image.network(
+                                        imageUrl,
+                                        width: 250,
+                                        height: 250,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.memory(
+                                        base64Decode(imageUrl),
+                                        width: 250,
+                                        height: 250,
+                                        fit: BoxFit.cover,
+                                      ),
                               );
                             } else {
                               return const Text('Image not found');

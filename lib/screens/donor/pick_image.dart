@@ -2,6 +2,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
+import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
+import 'package:donation_app/utils/image_compression.dart';
 
 class PickImage extends StatefulWidget {
   final Function(String) onImagePicked;
@@ -97,22 +100,29 @@ class _PickImageState extends State<PickImage> {
 
   Future<void> _uploadImageToFirebaseStorage(File imageFile) async {
     try {
-      String fileName = 'images/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      firebase_storage.Reference ref =
-          firebase_storage.FirebaseStorage.instance.ref().child(fileName);
-
-      await ref.putFile(imageFile);
+      String result;
+      if (StorageConfig.useFirebaseStorage) {
+        String fileName = 'images/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        firebase_storage.Reference ref =
+            firebase_storage.FirebaseStorage.instance.ref().child(fileName);
+        await ref.putFile(imageFile);
+        result = fileName;
+      } else {
+        // base64 in Firestore
+        final compressedBytes = await ImageCompressionUtil.compressImage(imageFile);
+        result = base64Encode(compressedBytes);
+      }
 
       setState(() {
         _uploading = false;
       });
 
-      widget.onImagePicked(fileName);
+      widget.onImagePicked(result);
     } catch (e) {
       setState(() {
         _uploading = false;
       });
-      print('Error uploading image to Firebase Storage: $e');
+      print('Error uploading image: $e');
     }
   }
 }

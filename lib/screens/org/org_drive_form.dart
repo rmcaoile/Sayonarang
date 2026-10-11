@@ -6,6 +6,8 @@ import "package:flutter/material.dart";
 import "package:intl/intl.dart";
 import "package:provider/provider.dart";
 import 'dart:io';
+import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
 import 'package:image_picker/image_picker.dart';
 
 // TODO: Add loading state for saving and loading images
@@ -78,12 +80,27 @@ class OrgDriveFormPageState extends State<OrgDriveFormPage> {
 
   Future<void> _loadDownloadURLs() async {
     if (widget.mode == "edit" || widget.mode == "view") {
-      List<String> downloadURLs = await context
-          .read<DriveProvider>()
-          .fetchDownloadURLsForImages(_photos);
-      setState(() {
-        _photosDownloadURLs = downloadURLs;
-      });
+      if (StorageConfig.useFirebaseStorage) {
+        List<String> downloadURLs = await context
+            .read<DriveProvider>()
+            .fetchDownloadURLsForImages(_photos);
+        setState(() {
+          _photosDownloadURLs = downloadURLs;
+        });
+      } else {
+        List<String> validPhotos = [];
+        for (String photo in _photos) {
+          try {
+            base64Decode(photo);
+            validPhotos.add(photo);
+          } catch (e) {
+            print('Invalid base64 image data in drive: $e');
+          }
+        }
+        setState(() {
+          _photosDownloadURLs = validPhotos;
+        });
+      }
     }
   }
 
@@ -303,11 +320,14 @@ class OrgDriveFormPageState extends State<OrgDriveFormPage> {
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(8),
                                     image: DecorationImage(
-                                      image: image is File
-                                          ? FileImage(image)
-                                          : NetworkImage(image)
-                                              as ImageProvider,
-                                      fit: BoxFit.cover,
+                                          image: image is File
+                                            ? FileImage(image)
+                                            : StorageConfig.useFirebaseStorage
+                                                ? NetworkImage(image)
+                                                : MemoryImage(
+                                                    base64Decode(image))
+                                                    as ImageProvider,
+                                       fit: BoxFit.cover,
                                     ),
                                   ),
                                 ),

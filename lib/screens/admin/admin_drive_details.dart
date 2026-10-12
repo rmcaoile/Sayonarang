@@ -344,6 +344,7 @@ class DriveDonationsList extends StatelessWidget {
           itemBuilder: (context, index) {
             Donation donation = Donation.fromJson(
                 snapshot.data!.docs[index].data() as Map<String, dynamic>);
+            donation.id = snapshot.data!.docs[index].id;
 
             IconData leadingIcon;
             Color statusColor;

@@ -103,9 +103,9 @@ class DonationProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void editAndLink(String status, String driveId) {
+  void editAndLink(String status, String driveId) async {
     String message =
-        firebaseService.editAndLink(_selectedDonation!.id, status, driveId);
+        await firebaseService.editAndLink(_selectedDonation!.id, status, driveId);
     print(message);
     notifyListeners();
   }

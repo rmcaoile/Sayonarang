@@ -28,9 +28,9 @@ class Drive {
       orgId: json['orgId'],
       title: json['title'],
       description: json['description'],
-      donationIds: (json['donationIds'] as List).cast<String>(),
+      donationIds: ((json['donationIds'] as List?) ?? <String>[]).cast<String>(),
       endDate: (json['endDate'] as Timestamp).toDate(),
-      photos: (json['photos'] as List).cast<String>(),
+      photos: ((json['photos'] as List?) ?? <String>[]).cast<String>(),
     );
   }
 

@@ -97,11 +97,13 @@ class OrgDonationsList extends StatelessWidget {
                   Donation donation = Donation.fromJson(
                       snapshot.data!.docs[index].data()
                           as Map<String, dynamic>);
+                  donation.id = snapshot.data!.docs[index].id;
                   return _buildDonationListItem(
                       context, donation, adminProvider);
                 } else {
                   Drive drive = Drive.fromJson(snapshot.data!.docs[index].data()
                       as Map<String, dynamic>);
+                  drive.id = snapshot.data!.docs[index].id;
                   return _buildDriveListItem(context, drive, adminProvider);
                 }
               },

@@ -107,36 +107,17 @@ class FirebaseDonationAPI {
     try {
       print("Drive ID: $driveId");
       print("id: $id");
-      await db.collection("donations").doc(id).update({
-        "driveId": driveId,
-      });
+      final batch = db.batch();
+      batch.update(
+        db.collection("donations").doc(id),
+        {"driveId": driveId},
+      );
       // add donation id to drive's list of donation ids
-      // TODO: Fix error
-      // List<String> donationIds = [];
-
-      // await db
-      //     .collection('drives')
-      //     .doc(id)
-      //     .get()
-      //     .then((DocumentSnapshot ds) {
-      //   // donationIds = (ds.data as DocumentSnapshot)['donationIds'];
-      //   donationIds = ds.data()!['donationIds'];
-      // });
-
-      // print(donationIds);
-
-      // DocumentSnapshot docSnapshot =
-      //     await db.collection('drives').doc(driveId).get();
-
-      // if (docSnapshot.exists) {
-      //   List<dynamic> donationIds = docSnapshot.get('donationIds');
-      //   print(donationIds);
-      //   await db.collection("drives").doc(driveId).update({
-      //     "donationIds": [...donationIds, id]
-      //   });
-      // } else {
-      //   print('Document does not exist on the database');
-      // }
+      batch.update(
+        db.collection("drives").doc(driveId),
+        {"donationIds": FieldValue.arrayUnion([id])},
+      );
+      await batch.commit();
 
       return "Successfully linked donation to $driveId!";
     } on FirebaseException catch (e) {
@@ -144,29 +125,31 @@ class FirebaseDonationAPI {
     }
   }
 
-  String editAndLink(
+  Future<String> editAndLink(
     String? id,
     String status,
     String driveId,
-  ) {
+  ) async {
+    if (id == null) {
+      return "Donation ID is null and cannot be linked to the drive.";
+    }
     try {
       print(">> Status: $status");
       print(">> Drive id: $driveId");
       print(">> Donation id: $id");
 
-      db.collection("donations").doc(id).update({
-        "status": status,
-      });
+      final batch = db.batch();
+      batch.update(
+        db.collection("donations").doc(id),
+        {"status": status, "driveId": driveId},
+      );
+      batch.update(
+        db.collection("drives").doc(driveId),
+        {"donationIds": FieldValue.arrayUnion([id])},
+      );
+      await batch.commit();
 
-      db.collection("donations").doc(id).update({
-        "driveId": driveId,
-      });
-
-      db.collection("drives").doc(driveId).update({
-        "driveIds": FieldValue.arrayUnion([id]),
-      });
-
-      return "Successfully linked donation status to $driveId!!";
+      return "Successfully linked donation status to $driveId!";
     } on FirebaseException catch (e) {
       return "Failed with error '${e.code}: ${e.message}";
     }

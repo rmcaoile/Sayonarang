@@ -1,3 +1,4 @@
+import 'package:donation_app/screens/shared/image_viewer.dart';
 import 'dart:convert';
 import 'package:donation_app/storage_config.dart';
 import 'package:flutter/material.dart';
@@ -180,19 +181,30 @@ class UserAccountDetails extends StatelessWidget {
                         } else {
                           final imageUrl = snapshot.data;
                           if (imageUrl != null) {
-                            return StorageConfig.useFirebaseStorage
-                                ? Image.network(
-                                    imageUrl,
-                                    width: 250,
-                                    height: 250,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Image.memory(
-                                    base64Decode(imageUrl),
-                                    width: 250,
-                                    height: 250,
-                                    fit: BoxFit.cover,
+                            return InkWell(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => ShowFullImage(
+                                        image: imageUrl,
+                                      ),
+                                    ),
                                   );
+                                },
+                                child: StorageConfig.useFirebaseStorage
+                                    ? Image.network(
+                                        imageUrl,
+                                        width: 250,
+                                        height: 250,
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Image.memory(
+                                        base64Decode(imageUrl),
+                                        width: 250,
+                                        height: 250,
+                                        fit: BoxFit.cover,
+                                      ),
+                              );
                           } else {
                             return const Text('Image not found');
                           }

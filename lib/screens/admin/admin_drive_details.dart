@@ -43,7 +43,6 @@ class _DriveScreenState extends State<DriveScreen> {
               color: Color(0xFFF54741),
             ),
           ),
-          backgroundColor: Colors.white,
           iconTheme: const IconThemeData(color: Color(0xFFF54741)),
           bottom: const TabBar(
             tabs: [

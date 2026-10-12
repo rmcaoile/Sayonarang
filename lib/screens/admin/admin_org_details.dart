@@ -37,7 +37,6 @@ class ViewOrgDetails extends StatelessWidget {
             color: Color(0xFFF54741),
           ),
         ),
-        backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Color(0xFFF54741)),
       ),
       body: ListView(

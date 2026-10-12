@@ -24,11 +24,11 @@ class _ViewOrganizationsState extends State<ViewOrganizations> {
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(kToolbarHeight),
           child: Container(
-            color: Colors.white,
+            color: const Color(0xFFF54741).withValues(alpha: 0.12),
             child: const TabBar(
-              labelColor: Color(0xFFF54642),
+              labelColor: Color(0xFFF54741),
               unselectedLabelColor: Colors.grey,
-              indicatorColor: Color(0xFFF54642),
+              indicatorColor: Color(0xFFF54741),
               tabs: [
                 Tab(text: 'Approved'),
                 Tab(text: 'Pending'),

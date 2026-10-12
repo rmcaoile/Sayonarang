@@ -158,8 +158,6 @@ class _DonorDriveDetailsPageState extends State<DonorDriveDetailsPage> {
             color: Color(0xFFF54741),
           ),
         ),
-        backgroundColor:
-            const Color(0xFFF54741).withValues(alpha: 0.12),
         iconTheme: const IconThemeData(color: Color(0xFFF54741)),
       ),
       body: Padding(

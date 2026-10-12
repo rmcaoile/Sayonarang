@@ -27,7 +27,6 @@ class _UserPageState extends State<UserPage> {
               color: Color(0xFFF54741),
             ),
           ),
-          backgroundColor: Colors.white,
           iconTheme: const IconThemeData(color: Color(0xFFF54741)),
           bottom: TabBar(
             tabs: [

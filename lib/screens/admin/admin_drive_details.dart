@@ -252,11 +252,13 @@ class _DriveDetailScreenState extends State<DriveDetailScreen> {
                       Row(
                         children: [
                           const SizedBox(width: 15),
-                          Text(
-                            widget.drive.description,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF666666),
+                          Expanded(
+                            child: Text(
+                              widget.drive.description,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                color: Color(0xFF666666),
+                              ),
                             ),
                           ),
                         ],

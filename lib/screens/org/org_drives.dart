@@ -49,7 +49,8 @@ class _OrgDrivesPageState extends State<OrgDrivesPage> {
               color: Theme.of(context).colorScheme.primary,
             ),
           ),
-          bottom: const TabBar(
+          bottom: TabBar(
+            dividerColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
             tabs: [
               Tab(text: "Ongoing"),
               Tab(text: "Finished"),

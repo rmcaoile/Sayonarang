@@ -249,6 +249,7 @@ class _DonorDonationsPageState extends State<DonorDonationsPage> {
               ),
               bottom: TabBar(
                 isScrollable: true,
+                dividerColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
                 tabs: [
                   _buildStatusTab(
                       'Pending', _countDonations(donations, 'pending')),

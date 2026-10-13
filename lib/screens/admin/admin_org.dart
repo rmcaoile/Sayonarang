@@ -34,6 +34,7 @@ class _ViewOrganizationsState extends State<ViewOrganizations> {
                   labelColor: const Color(0xFFF54741),
                   unselectedLabelColor: Colors.grey,
                   indicatorColor: const Color(0xFFF54741),
+                  dividerColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
                   tabs: [
                     const Tab(text: 'Approved'),
                     Tab(

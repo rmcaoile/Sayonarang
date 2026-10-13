@@ -44,6 +44,7 @@ class _ShowDonationsState extends State<ShowDonations>
         bottom: TabBar(
           isScrollable: true,
           controller: _tabController,
+          dividerColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
           tabs: const [
             Tab(text: 'Pending'),
             Tab(text: 'Confirmed'),

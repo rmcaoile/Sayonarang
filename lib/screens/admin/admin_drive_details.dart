@@ -44,8 +44,9 @@ class _DriveScreenState extends State<DriveScreen> {
             ),
           ),
           iconTheme: const IconThemeData(color: Color(0xFFF54741)),
-          bottom: const TabBar(
-            tabs: [
+          bottom: TabBar(
+            dividerColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+            tabs: const [
               Tab(text: 'Donations'),
               Tab(text: 'Drive Details'),
             ],

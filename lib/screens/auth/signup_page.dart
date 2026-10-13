@@ -438,10 +438,14 @@ class _SignupPageState extends State<SignupPage> with TickerProviderStateMixin {
 
                     // container for tab bar
                     Container(
-                      child: TabBar(controller: tabController, tabs: const [
-                        Tab(text: 'As a Donor'),
-                        Tab(text: 'As an Organization'),
-                      ]),
+                      child: TabBar(
+                        controller: tabController,
+                        dividerColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+                        tabs: const [
+                          Tab(text: 'As a Donor'),
+                          Tab(text: 'As an Organization'),
+                        ],
+                      ),
                     ),
 
                     // container for contents of tab bar

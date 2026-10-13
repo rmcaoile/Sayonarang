@@ -39,6 +39,42 @@ class _DonorDonationsPageState extends State<DonorDonationsPage> {
     return userDetails['name'] as String? ?? 'Unknown Organization';
   }
 
+  int _countDonations(List<Donation> donations, String status) {
+    return donations
+        .where((donation) => donation.status.toLowerCase() == status)
+        .length;
+  }
+
+  Tab _buildStatusTab(String label, int count) {
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (count > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              constraints: const BoxConstraints(minWidth: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF54741),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildDonationList(List<Donation> donations, String status) {
     List<Donation> filteredDonations = donations.where((donation) {
       return donation.status.toLowerCase() == status.toLowerCase();
@@ -158,68 +194,77 @@ class _DonorDonationsPageState extends State<DonorDonationsPage> {
 
     final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
-    return DefaultTabController(
-      length: 5,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            "Donations",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.primary,
+    return StreamBuilder<QuerySnapshot>(
+      stream: donationsStream,
+      builder: (context, snapshot) {
+        // convert data from donations stream to a list
+        final List<Donation> donations = <Donation>[];
+        if (snapshot.hasData) {
+          for (final doc in snapshot.data!.docs) {
+            final Donation donation =
+                Donation.fromJson(doc.data() as Map<String, dynamic>);
+            donation.id = doc.id;
+            donations.add(donation);
+          }
+        }
+
+        Widget body;
+        if (snapshot.hasError) {
+          body = Center(
+            child: Text("Error encountered! ${snapshot.error}"),
+          );
+        } else if (snapshot.connectionState == ConnectionState.waiting) {
+          body = const Center(
+            child: CircularProgressIndicator(),
+          );
+        } else if (donations.isEmpty) {
+          body = const Center(
+            child: Text(
+              'No donations yet!',
+              style: TextStyle(fontSize: 18),
             ),
-          ),
-          bottom: const TabBar(
-            isScrollable: true,
-            tabs: [
-              Tab(text: "Pending"),
-              Tab(text: "Confirmed"),
-              Tab(text: "Scheduled"),
-              Tab(text: "Completed"),
-              Tab(text: "Cancelled"),
+          );
+        } else {
+          body = TabBarView(
+            children: [
+              _buildDonationList(donations, 'pending'),
+              _buildDonationList(donations, 'confirmed'),
+              _buildDonationList(donations, 'scheduled for pick-up'),
+              _buildDonationList(donations, 'completed'),
+              _buildDonationList(donations, 'cancelled'),
             ],
-          ),
-        ),
-        body: StreamBuilder<QuerySnapshot>(
-          stream: donationsStream,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Text("Error encountered! ${snapshot.error}"),
-              );
-            } else if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
-            } else if (snapshot.data == null || snapshot.data!.docs.isEmpty) {
-              return const Center(
-                child: Text(
-                  'No donations yet!',
-                  style: TextStyle(fontSize: 18),
+          );
+        }
+
+        return DefaultTabController(
+          length: 5,
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(
+                "Donations",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
                 ),
-              );
-            }
-
-            // convert data from donations stream to a list
-            List<Donation> donations = snapshot.data!.docs.map((doc) {
-              Donation donation =
-                  Donation.fromJson(doc.data() as Map<String, dynamic>);
-              donation.id = doc.id;
-              return donation;
-            }).toList();
-
-            return TabBarView(
-              children: [
-                _buildDonationList(donations, 'pending'),
-                _buildDonationList(donations, 'confirmed'),
-                _buildDonationList(donations, 'scheduled for pick-up'),
-                _buildDonationList(donations, 'completed'),
-                _buildDonationList(donations, 'cancelled'),
-              ],
-            );
-          },
-        ),
-      ),
+              ),
+              bottom: TabBar(
+                isScrollable: true,
+                tabs: [
+                  _buildStatusTab(
+                      'Pending', _countDonations(donations, 'pending')),
+                  _buildStatusTab(
+                      'Confirmed', _countDonations(donations, 'confirmed')),
+                  _buildStatusTab('Scheduled',
+                      _countDonations(donations, 'scheduled for pick-up')),
+                  const Tab(text: "Completed"),
+                  const Tab(text: "Cancelled"),
+                ],
+              ),
+            ),
+            body: body,
+          ),
+        );
+      },
     );
   }
 }

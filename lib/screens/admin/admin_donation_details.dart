@@ -364,7 +364,7 @@ class _DonationDetailScreenState extends State<DonationDetailScreen> {
       case 'confirmed':
         statusColor = Colors.blue;
         break;
-      case 'scheduled':
+      case 'scheduled for pick-up':
         statusColor = Colors.blue;
         break;
       case 'completed':

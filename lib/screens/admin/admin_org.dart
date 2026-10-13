@@ -51,7 +51,7 @@ class _ViewOrganizationsState extends State<ViewOrganizations> {
                                 vertical: 1,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.orange,
+                                color: const Color(0xFFF54741),
                                 borderRadius: BorderRadius.circular(9),
                               ),
                               child: Text(

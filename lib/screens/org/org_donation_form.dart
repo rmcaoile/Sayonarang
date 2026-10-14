@@ -11,6 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:donation_app/storage_config.dart';
 
 // TODO: Add loading state for saving and loading image
@@ -38,6 +39,8 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
   late String _photoDownloadURL;
   late String _status;
   // late DateTime _timestamp;
+
+  StreamSubscription? _drivesSubscription;
 
   Donation? _selectedDonation;
   String? _driveTitle;
@@ -77,6 +80,7 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
 
   @override
   void dispose() {
+    _drivesSubscription?.cancel();
     _otherCategoriesController.dispose();
     _weightController.dispose();
     for (var controller in _addressControllers) {
@@ -120,6 +124,9 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
   }
 
   Future<void> _showDonationDrivesModal(BuildContext context) async {
+    // cancel any existing subscription before creating a new one
+    _drivesSubscription?.cancel();
+
     // fetch drives
     context.read<DriveProvider>().fetchDrivesByOrg(_currentUser!.uid);
 
@@ -141,7 +148,7 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
     // );
 
     // listen to the stream for changes
-    drivesStream.listen((QuerySnapshot snapshot) {
+    _drivesSubscription = drivesStream.listen((QuerySnapshot snapshot) {
       // convert data from drives stream to a list
       List<Drive> drives = snapshot.docs.map((doc) {
         Drive drive = Drive.fromJson(doc.data() as Map<String, dynamic>);
@@ -208,6 +215,9 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
                       context
                           .read<DonationProvider>()
                           .editAndLink("confirmed", drive.id!);
+
+                      // cancel subscription to prevent further stream events
+                      _drivesSubscription?.cancel();
 
                       Navigator.of(context)
                         ..pop()

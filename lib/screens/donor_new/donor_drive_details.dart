@@ -7,16 +7,21 @@ import 'package:donation_app/models/drive_model.dart';
 import 'package:donation_app/providers/drive_provider.dart';
 import 'package:donation_app/screens/donor_new/donor_donation_form.dart';
 import 'package:donation_app/screens/shared/image_slider.dart';
+import 'package:donation_app/screens/shared/image_viewer.dart';
 import 'package:donation_app/storage_config.dart';
 
 class DonorDriveDetailsPage extends StatefulWidget {
   final Drive drive;
   final String userName;
+  final String? profileImageUrl;
+  final String status;
 
   const DonorDriveDetailsPage({
     Key? key,
     required this.drive,
     required this.userName,
+    this.profileImageUrl,
+    this.status = '',
   }) : super(key: key);
 
   @override
@@ -147,6 +152,17 @@ class _DonorDriveDetailsPageState extends State<DonorDriveDetailsPage> {
     return initials.toUpperCase();
   }
 
+  ImageProvider? _getImageProvider() {
+    if (widget.profileImageUrl == null ||
+        widget.profileImageUrl!.isEmpty) {
+      return null;
+    }
+    if (StorageConfig.useFirebaseStorage) {
+      return NetworkImage(widget.profileImageUrl!);
+    }
+    return MemoryImage(base64Decode(widget.profileImageUrl!));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,22 +183,70 @@ class _DonorDriveDetailsPageState extends State<DonorDriveDetailsPage> {
             Card(
               surfaceTintColor: Colors.transparent,
               elevation: 4,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.35),
+                  width: 1,
+                ),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
                     const SizedBox(height: 10),
-                    CircleAvatar(
-                      radius: 35,
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primary,
-                      child: Text(
-                        _orgInitials(widget.userName),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    GestureDetector(
+                      onTap: () {
+                        if (widget.profileImageUrl == null ||
+                            widget.profileImageUrl!.isEmpty) {
+                          return;
+                        }
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => ShowFullImage(
+                              image: widget.profileImageUrl!,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 44,
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primary,
+                            backgroundImage: _getImageProvider(),
+                            child: _getImageProvider() == null
+                                ? Text(
+                                    _orgInitials(widget.userName),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          if (widget.status == 'approved')
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: Colors.white, width: 2),
+                                ),
+                                child: const Icon(
+                                  Icons.verified,
+                                  size: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 10),

@@ -1,4 +1,5 @@
 import 'package:donation_app/screens/donor_new/donor_org.dart';
+import 'package:donation_app/screens/donor_new/org_card.dart';
 import 'package:flutter/material.dart';
 import 'package:donation_app/providers/user_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -43,43 +44,20 @@ class _DonorHomePageState extends State<DonorHomePage> {
   }
 
   Widget _buildOrgCard(user_model.User org) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: InkWell(
-        onTap: () {
-          // change selected org
-          context.read<MyAuthProvider>().changeSelectedOrg(org);
+    return OrgCard(
+      org: org,
+      onTap: () {
+        // change selected org
+        context.read<MyAuthProvider>().changeSelectedOrg(org);
 
-          // navigate to the org details  page
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const DonorOrgPage(),
-            ),
-          );
-        },
-        child: Card(
-          surfaceTintColor: Colors.transparent,
-          child: ListTile(
-            title: Text(
-              org.name,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1, // limit name to one line
-            ),
-            subtitle: Text(
-              org.description == '' ? "No description yet." : org.description,
-              style: const TextStyle(fontSize: 16),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey),
+        // navigate to the org details page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const DonorOrgPage(),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

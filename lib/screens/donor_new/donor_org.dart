@@ -6,9 +6,10 @@ import 'package:donation_app/providers/drive_provider.dart';
 import 'package:donation_app/providers/user_provider.dart';
 import 'package:donation_app/screens/donor_new/donor_donation_form.dart';
 import 'package:donation_app/screens/donor_new/donor_drive_details.dart';
+import 'package:donation_app/screens/shared/image_viewer.dart';
+import 'package:donation_app/storage_config.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:donation_app/storage_config.dart';
 import '../../models/user_model.dart';
 import '../../providers/admin_provider.dart';
 
@@ -56,6 +57,13 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
               Card(
                 surfaceTintColor: Colors.transparent,
                 elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.35),
+                    width: 1,
+                  ),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -64,17 +72,58 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor:
-                                Theme.of(context).colorScheme.primary,
-                            child: Text(
-                              _orgInitials(_selectedOrg!.name),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          GestureDetector(
+                            onTap: () {
+                              if (_selectedOrg!.profileImageUrl == null ||
+                                  _selectedOrg!.profileImageUrl!.isEmpty) {
+                                return;
+                              }
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => ShowFullImage(
+                                    image: _selectedOrg!.profileImageUrl!,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 44,
+                                  backgroundColor:
+                                      Theme.of(context).colorScheme.primary,
+                                  backgroundImage: _getImageProvider(),
+                                  child: _getImageProvider() == null
+                                      ? Text(
+                                          _orgInitials(_selectedOrg!.name),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 28,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                                if (_selectedOrg!.status == 'approved')
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border:
+                                            Border.all(color: Colors.white, width: 2),
+                                      ),
+                                      child: const Icon(
+                                        Icons.verified,
+                                        size: 18,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -93,7 +142,7 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 Text(
-                                  _selectedOrg!.username,
+                                  '@${_selectedOrg!.username}'                                  ,
                                   style: const TextStyle(
                                       fontSize: 16,
                                       color: Color(0xFF666666),
@@ -136,63 +185,76 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Expanded(
-                              child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Contact Number:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Addresses:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          )),
+                          const Icon(
+                            Icons.phone,
+                            size: 18,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 8),
                           Expanded(
-                              child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _selectedOrg!.contactNum,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Color(0xFF666666),
-                                ),
+                            child: Text(
+                              _selectedOrg!.contactNum.isEmpty
+                                  ? 'Not set'
+                                  : _selectedOrg!.contactNum,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF666666),
                               ),
-                              const SizedBox(height: 8),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children:
-                                    _selectedOrg!.addresses.map((address) {
-                                  return Padding(
-                                    padding:
-                                        const EdgeInsets.only(bottom: 16.0),
-                                    child: Text(
-                                      address,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: Color(0xFF666666),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ))
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      if (_selectedOrg!.addresses.isNotEmpty)
+                        ..._selectedOrg!.addresses.map((address) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 18,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  address,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: Color(0xFF666666),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ))
+                      else
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.location_off_outlined,
+                              size: 18,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Not set',
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF666666),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -298,6 +360,10 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
         elevation: 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: colorScheme.outline.withValues(alpha: 0.35),
+            width: 1,
+          ),
         ),
         child: InkWell(
           onTap: () {
@@ -311,6 +377,8 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
                 builder: (context) => DonorDriveDetailsPage(
                   drive: drive,
                   userName: _selectedOrg!.name,
+                  profileImageUrl: _selectedOrg!.profileImageUrl,
+                  status: _selectedOrg!.status,
                 ),
               ),
             );
@@ -425,8 +493,8 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
             image: StorageConfig.useFirebaseStorage
                 ? NetworkImage(image)
                 : MemoryImage(base64Decode(image)) as ImageProvider,
-            width: 72,
-            height: 72,
+            width: 88,
+            height: 88,
             fit: BoxFit.cover,
           ),
         );
@@ -436,8 +504,8 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
 
   Widget _driveThumbnailPlaceholder() {
     return Container(
-      width: 72,
-      height: 72,
+      width: 88,
+      height: 88,
       decoration: BoxDecoration(
         color: Colors.grey[200],
         borderRadius: BorderRadius.circular(8),
@@ -454,4 +522,18 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
         (first.isNotEmpty ? first[0] : '') + (second.isNotEmpty ? second[0] : '');
     return initials.toUpperCase();
   }
- }
+
+  ImageProvider? _getImageProvider() {
+    if (_selectedOrg == null) {
+      return null;
+    }
+    final profileImageUrl = _selectedOrg!.profileImageUrl;
+    if (profileImageUrl == null || profileImageUrl.isEmpty) {
+      return null;
+    }
+    if (StorageConfig.useFirebaseStorage) {
+      return NetworkImage(profileImageUrl);
+    }
+    return MemoryImage(base64Decode(profileImageUrl));
+  }
+}

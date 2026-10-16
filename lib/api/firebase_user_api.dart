@@ -195,4 +195,29 @@ class FirebaseAuthAPI {
       throw Exception("Failed to retrieve user: ${e.message}");
     }
   }
+
+  Future<String> updateDonorProfile(
+    String? userId,
+    String name,
+    String username,
+    String contactNum,
+    List<String> addresses,
+    String? profileImageUrl,
+  ) async {
+    try {
+      Map<String, dynamic> updateData = {
+        "name": name,
+        "username": username,
+        "contactNum": contactNum,
+        "addresses": addresses,
+      };
+      if (profileImageUrl != null) {
+        updateData["profileImageUrl"] = profileImageUrl;
+      }
+      await db.collection("users").doc(userId).update(updateData);
+      return "Successfully updated donor profile!";
+    } on FirebaseException catch (e) {
+      return "Failed with error '${e.code}: ${e.message}'";
+    }
+  }
 }

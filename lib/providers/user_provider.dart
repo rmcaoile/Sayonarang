@@ -172,4 +172,22 @@ class MyAuthProvider with ChangeNotifier {
       throw Exception("Failed to retrieve user: ${e.toString()}");
     }
   }
+
+  Future<String> updateDonorProfile(
+    String userId,
+    String name,
+    String username,
+    String contactNum,
+    List<String> addresses,
+    String? profileImageUrl,
+  ) async {
+    try {
+      String message = await authService.updateDonorProfile(
+          userId, name, username, contactNum, addresses, profileImageUrl);
+      notifyListeners();
+      return message;
+    } catch (e) {
+      throw Exception("Failed to update donor profile: ${e.toString()}");
+    }
+  }
 }

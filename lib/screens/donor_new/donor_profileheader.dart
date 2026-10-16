@@ -332,7 +332,7 @@ class ProfileHeader extends StatelessWidget {
                 ),
               );
             }),
-            const SizedBox(height: 8),
+            // const SizedBox(height: 8),
             TextButton.icon(
               onPressed: onAddAddress,
               icon: const Icon(Icons.add, size: 20),

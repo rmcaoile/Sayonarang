@@ -12,6 +12,7 @@ class User {
   String status; // pending, approved, rejected (for org)
   bool isOpen;
   String description;
+  String? profileImageUrl;
 
   User({
     this.id,
@@ -24,6 +25,7 @@ class User {
     required this.status, // only for org
     required this.isOpen, // only for org (if accepting donations)
     required this.description, // only for org
+    this.profileImageUrl,
   });
 
   // Factory constructor to instantiate object from json format
@@ -43,6 +45,7 @@ class User {
       status: json['status'],
       isOpen: json['isOpen'],
       description: json['description'],
+      profileImageUrl: json['profileImageUrl'],
     );
   }
 
@@ -62,6 +65,7 @@ class User {
       'status': user.status,
       'isOpen': user.isOpen,
       'description': user.description,
+      'profileImageUrl': user.profileImageUrl,
     };
   }
 }

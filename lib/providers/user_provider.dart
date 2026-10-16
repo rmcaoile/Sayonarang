@@ -153,9 +153,10 @@ class MyAuthProvider with ChangeNotifier {
     List<String> addresses,
     String contactNum,
     bool isOpen,
+    String? profileImageUrl,
   ) async {
     String message = await authService.editOrgDetails(
-        userId, description, addresses, contactNum, isOpen);
+        userId, description, addresses, contactNum, isOpen, profileImageUrl);
     print(message);
     notifyListeners();
   }

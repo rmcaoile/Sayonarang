@@ -1,13 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:donation_app/models/user_model.dart' as user_model;
 import 'package:donation_app/providers/user_provider.dart';
-import 'package:donation_app/screens/org/org_main.dart';
+import 'package:donation_app/screens/org/org_profileheader.dart';
+import 'package:donation_app/screens/shared/image_viewer.dart';
+import 'package:donation_app/utils/image_compression.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:donation_app/models/user_model.dart' as user_model;
-
-// TODO: Add loading state for saving and loading images
-// TODO: Add snackbar to show successfully edited or successfully saved
 
 class OrgProfilePage extends StatefulWidget {
   final String mode; // edit, view
@@ -20,36 +23,35 @@ class OrgProfilePage extends StatefulWidget {
 class OrgProfilePageState extends State<OrgProfilePage> {
   late User? _currentUser;
   late Future<DocumentSnapshot> _userDocFuture;
+  bool _isEditing = false;
+  bool _isSaving = false;
+  String? _localProfileImageBase64;
 
+  final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _usernameController;
+  late TextEditingController _descriptionController;
   late List<TextEditingController> _addressControllers;
   late TextEditingController _contactNumController;
-  late TextEditingController _descriptionController;
-  late String _status;
   late bool _isOpen;
-  bool _isLoading = true; // Add a loading state
-
-  bool get isViewMode => widget.mode == "view";
-  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
+    _isEditing = widget.mode == "edit";
 
     _nameController = TextEditingController();
     _usernameController = TextEditingController();
     _descriptionController = TextEditingController();
     _addressControllers = [TextEditingController()];
     _contactNumController = TextEditingController();
-    _status = '';
     _isOpen = false;
 
     _currentUser = FirebaseAuth.instance.currentUser;
     if (_currentUser != null) {
       _userDocFuture =
           context.read<MyAuthProvider>().getUserById(_currentUser!.uid);
-      _getUserDetails(); // Call _getUserDetails to fetch user details
+      _getUserDetails();
     }
   }
 
@@ -57,25 +59,12 @@ class OrgProfilePageState extends State<OrgProfilePage> {
   void dispose() {
     _nameController.dispose();
     _usernameController.dispose();
+    _descriptionController.dispose();
     for (var controller in _addressControllers) {
       controller.dispose();
     }
     _contactNumController.dispose();
-    _descriptionController.dispose();
     super.dispose();
-  }
-
-  Color getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'approved':
-        return Colors.green;
-      case 'rejected':
-        return Colors.red;
-      default:
-        return Colors.black;
-    }
   }
 
   Future<void> _getUserDetails() async {
@@ -83,6 +72,7 @@ class OrgProfilePageState extends State<OrgProfilePage> {
     final userData =
         user_model.User.fromJson(userSnapshot.data() as Map<String, dynamic>);
 
+    if (!mounted) return;
     setState(() {
       _nameController.text = userData.name;
       _usernameController.text = userData.username;
@@ -91,93 +81,56 @@ class OrgProfilePageState extends State<OrgProfilePage> {
           .map((address) => TextEditingController(text: address))
           .toList();
       _contactNumController.text = userData.contactNum;
-      _status = userData.status;
       _isOpen = userData.isOpen;
-      _isLoading = false; // Set loading to false after data is fetched
     });
   }
 
-  Widget _buildFormField({
-    required BuildContext context,
-    required type, // text, date, time
-    required String label,
-    required TextEditingController controller,
-    required bool enabled,
-    required String? Function(String?) validator,
-    int minLines = 1,
-    int? maxLines,
-    Widget? suffixIcon,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: controller,
-            enabled: enabled,
-            validator: validator,
-            minLines: minLines,
-            maxLines: maxLines,
-            onTap: () {
-              // if (type == 'date') {
-              //   _showDatePicker(context, controller);
-              // } else if (type == 'time') {
-              //   _showTimePicker(context, controller);
-              // }
-            },
-            style: const TextStyle(color: Colors.black),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.grey[100],
-              labelText: label,
-              floatingLabelBehavior: FloatingLabelBehavior.never,
-              alignLabelWithHint: true,
-              suffixIcon: suffixIcon,
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(8.0)),
-              ),
-              enabledBorder: const OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Colors.grey,
-                  width: 1.0,
-                ),
-                borderRadius: BorderRadius.all(Radius.circular(8.0)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 2.0,
-                ),
-                borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-              ),
-              disabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Colors.grey.shade400,
-                  width: 1.0,
-                ),
-                borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-              ),
-            ),
-          ),
-        ],
+  void _initializeControllers(user_model.User profile) {
+    _nameController.text = profile.name;
+    _usernameController.text = profile.username;
+    _descriptionController.text = profile.description;
+    _contactNumController.text = profile.contactNum;
+    _isOpen = profile.isOpen;
+    _addressControllers = profile.addresses
+        .map((addr) => TextEditingController(text: addr))
+        .toList();
+    if (_addressControllers.isEmpty) {
+      _addressControllers.add(TextEditingController());
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 80,
+    );
+
+    if (pickedFile != null) {
+      final file = File(pickedFile.path);
+      final compressedBytes = await ImageCompressionUtil.compressImage(file);
+      final base64Image = base64Encode(compressedBytes);
+
+      if (mounted) {
+        setState(() {
+          _localProfileImageBase64 = base64Image;
+        });
+      }
+    }
+  }
+
+  void _viewProfileImage(String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ShowFullImage(image: imageUrl),
       ),
     );
   }
 
-  Future<bool?> _showBackDialog() {
-    if (isViewMode) {
-      // return true immediately if in view mode
-      return Future.value(true);
-    }
+  Future<bool?> _showCancelEditDialog() {
     return showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
@@ -210,308 +163,354 @@ class OrgProfilePageState extends State<OrgProfilePage> {
     );
   }
 
+  Future<void> _saveOrgProfile() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final description = _descriptionController.text.trim();
+    final contact = _contactNumController.text.trim();
+    final addresses = _addressControllers
+        .map((c) => c.text.trim())
+        .where((a) => a.isNotEmpty)
+        .toList();
+
+    if (description.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Description is required')),
+        );
+      }
+      return;
+    }
+
+    if (contact.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Contact number is required')),
+        );
+      }
+      return;
+    }
+
+    if (addresses.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('At least one address is required')),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    final imageUrl = _localProfileImageBase64;
+
+    context.read<MyAuthProvider>().editOrgDetails(
+          _currentUser!.uid,
+          description,
+          addresses,
+          contact,
+          _isOpen,
+          imageUrl,
+        );
+
+    try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully!')),
+        );
+        setState(() {
+          _isEditing = false;
+          _localProfileImageBase64 = null;
+        });
+        _userDocFuture =
+            context.read<MyAuthProvider>().getUserById(_currentUser!.uid);
+        _getUserDetails();
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _cancelEdit() async {
+    final shouldCancel = await _showCancelEditDialog() ?? false;
+    if (!context.mounted || !shouldCancel) return;
+
+    try {
+      final DocumentSnapshot userSnapshot = await _userDocFuture;
+      final userData =
+          user_model.User.fromJson(userSnapshot.data() as Map<String, dynamic>);
+
+      if (!mounted) return;
+      setState(() {
+        _isEditing = false;
+        _localProfileImageBase64 = null;
+        _initializeControllers(userData);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to cancel edit: $e')),
+        );
+      }
+    }
+  }
+
+  void _addAddress() {
+    setState(() {
+      _addressControllers.add(TextEditingController());
+    });
+  }
+
+  void _removeAddress(int index) {
+    if (_addressControllers.length > 1) {
+      setState(() {
+        _addressControllers[index].dispose();
+        _addressControllers.removeAt(index);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final ColorScheme colorScheme = Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return PopScope(
-      canPop: false,
+      canPop: !_isEditing,
       onPopInvoked: (bool didPop) async {
-        if (didPop) {
-          return;
-        }
-        final bool shouldPop = await _showBackDialog() ?? false;
-        if (context.mounted && shouldPop) {
-          Navigator.pop(context);
+        if (didPop) return;
+        final bool shouldCancel = await _showCancelEditDialog() ?? false;
+        if (context.mounted && shouldCancel) {
+          setState(() => _isEditing = false);
+          _userDocFuture =
+              context.read<MyAuthProvider>().getUserById(_currentUser!.uid);
+          _getUserDetails();
         }
       },
       child: Scaffold(
         appBar: AppBar(
-            title: Text(
-          "${widget.mode == "edit" ? "Edit" : ""} Profile",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.primary,
+          title: Text(
+            'Profile',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.primary,
+            ),
           ),
-        )),
-        body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      if (isViewMode) ...[
-                        const SizedBox(height: 8),
-                        const Icon(
-                          Icons.business,
-                          size: 72,
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: getStatusColor(_status),
-                            borderRadius: BorderRadius.circular(64.0),
+          iconTheme: IconThemeData(color: colorScheme.primary),
+          actions: [
+            if (!_isEditing)
+              IconButton(
+                icon: const Icon(Icons.logout),
+                onPressed: () => context.read<MyAuthProvider>().signOut(),
+                tooltip: 'Logout',
+              ),
+          ],
+        ),
+        body: _currentUser == null
+            ? const Center(child: Text('No user is currently signed in'))
+            : FutureBuilder<DocumentSnapshot>(
+                future: _userDocFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, size: 64,
+                              color: colorScheme.error),
+                          const SizedBox(height: 16),
+                          Text('Error: ${snapshot.error}'),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () => setState(() {
+                              _userDocFuture =
+                                  context.read<MyAuthProvider>()
+                                      .getUserById(_currentUser!.uid);
+                              _getUserDetails();
+                            }),
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
                           ),
-                          child: Text(
-                            'Status: ${_status}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16.0,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      _buildFormField(
-                        context: context,
-                        type: 'text',
-                        label: 'Name',
-                        controller: _nameController,
-                        enabled: false,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a name';
-                          }
-                          return null;
-                        },
+                        ],
                       ),
-                      _buildFormField(
-                        context: context,
-                        type: 'text',
-                        label: 'Username',
-                        controller: _usernameController,
-                        enabled: false,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a username';
-                          }
-                          return null;
-                        },
-                      ),
-                      // only description, addresses, contact number, and isOpen can be edited by the org
-                      _buildFormField(
-                        context: context,
-                        type: 'text',
-                        label: 'Description',
-                        controller: _descriptionController,
-                        enabled: !isViewMode,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a description';
-                          }
-                          return null;
-                        },
-                        minLines: 5,
-                        maxLines: null,
-                      ),
-                      ..._addressControllers.map((controller) {
-                        final int index =
-                            _addressControllers.indexOf(controller);
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: _buildFormField(
-                                context: context,
-                                type: 'text',
-                                label: 'Address ${index + 1}',
-                                controller: controller,
-                                enabled: !isViewMode,
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'Please enter an address';
-                                  }
-                                  return null;
-                                },
-                                minLines: 1,
-                                maxLines: null,
-                              ),
-                            ),
-                            if (!isViewMode &&
-                                index !=
-                                    0) // ensure the first address is not removable
-                              // TODO: Fix alignment of button to remove address
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle,
-                                    color: Colors.red),
-                                onPressed: () {
-                                  setState(() {
-                                    _addressControllers.removeAt(index);
-                                  });
-                                },
-                              ),
-                          ],
-                        );
-                      }).toList(),
-                      if (!isViewMode)
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _addressControllers.add(TextEditingController());
-                            });
-                          },
-                          child: const Text('Add Address'),
-                        ),
-                      _buildFormField(
-                        context: context,
-                        type: 'text',
-                        label: 'Contact Number',
-                        controller: _contactNumController,
-                        enabled: !isViewMode,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a contact number';
-                          }
-                          return null;
-                        },
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 8, horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Are you accepting donations?',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            IgnorePointer(
-                              ignoring: isViewMode,
-                              child: Row(children: [
-                                const Text("No"),
-                                const SizedBox(width: 4),
-                                Switch(
-                                    value: _isOpen,
-                                    onChanged: !isViewMode
-                                        ? (value) {
-                                            setState(() {
-                                              _isOpen = value;
-                                            });
-                                          }
-                                        : null,
-                                    activeColor:
-                                        Theme.of(context).colorScheme.primary),
-                                const SizedBox(width: 4),
-                                const Text("Yes"),
-                              ]),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (!isViewMode) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 8, horizontal: 8),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                if (_formKey.currentState!.validate()) {
-                                  if (!context.mounted) return; // mounted check
-                                  context.read<MyAuthProvider>().editOrgDetails(
-                                        _currentUser!.uid,
-                                        _descriptionController.text,
-                                        _addressControllers
-                                            .map(
-                                                (controller) => controller.text)
-                                            .toList(),
-                                        _contactNumController.text,
-                                        _isOpen,
-                                      );
+                    );
+                  } else if (!snapshot.hasData || !snapshot.data!.exists) {
+                    return const Center(child: Text('User not found'));
+                  } else {
+                    final userData =
+                        user_model.User.fromJson(snapshot.data!.data() as Map<String, dynamic>);
 
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Successfully edited the profile!')),
-                                  );
-                                  // Navigator.of(context)
-                                  //     .pop(); // TODO: Fix changes not reflecting after editing org
-                                  // Navigator.of(context).pop();
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => OrgMainPage(),
-                                    ),
-                                  );
+                    final displayName = _isEditing ? _nameController.text : userData.name;
+                    final displayUsername =
+                        _isEditing ? _usernameController.text : userData.username;
+                    final displayContact =
+                        _isEditing ? _contactNumController.text : userData.contactNum;
+                    final displayDescription =
+                        _isEditing ? _descriptionController.text : userData.description;
+                    final displayAddresses =
+                        _isEditing
+                            ? _addressControllers.map((c) => c.text).toList()
+                            : userData.addresses;
+                    final displayImageUrl =
+                        _localProfileImageBase64 ?? userData.profileImageUrl;
+
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            OrgProfileHeader(
+                              orgName: displayName,
+                              username: displayUsername,
+                              contactNum: displayContact,
+                              description: displayDescription,
+                              addresses: displayAddresses,
+                              status: userData.status,
+                              isOpen: _isOpen,
+                              profileImageUrl: displayImageUrl,
+                              isEditing: _isEditing,
+                              onEditPressed: () {
+                                if (_isEditing) {
+                                  _saveOrgProfile();
+                                } else {
+                                  setState(() => _isEditing = true);
                                 }
                               },
-                              style: ElevatedButton.styleFrom(
-                                foregroundColor:
-                                    Theme.of(context).colorScheme.onPrimary,
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primary,
-                              ),
-                              child: const Text('Save'),
+                              onImageTap: _pickImage,
+                              onImageViewTap: () =>
+                                  _viewProfileImage(displayImageUrl),
+                              onAddAddress: _addAddress,
+                              onRemoveAddress: _removeAddress,
+                              nameController:
+                                  _isEditing ? _nameController : null,
+                              usernameController:
+                                  _isEditing ? _usernameController : null,
+                              descriptionController: _isEditing
+                                  ? _descriptionController
+                                  : null,
+                              contactController:
+                                  _isEditing ? _contactNumController : null,
+                              addressControllers: _isEditing
+                                  ? _addressControllers
+                                  : null,
+                              onIsOpenChanged: (value) =>
+                                  setState(() => _isOpen = value),
                             ),
-                          ),
-                        ),
-                      ],
-                      if (isViewMode) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 8, horizontal: 8),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _status == 'approved'
-                                  ? () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              OrgProfilePage(mode: "edit"),
+                            const SizedBox(height: 24),
+                            if (_isEditing) ...[
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _isSaving
+                                          ? null
+                                          : () async {
+                                              await _cancelEdit();
+                                            },
+                                      icon: const Icon(Icons.cancel, size: 22),
+                                      label: const Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                      );
-                                    }
-                                  : null, // disable the button if status is not 'approved'
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: _status == 'approved'
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Colors.grey,
-                                side: BorderSide(
-                                  color: _status == 'approved'
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Colors.grey,
-                                  width: 2.0,
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        foregroundColor: colorScheme.primary,
+                                        side: BorderSide(color: colorScheme.primary, width: 2),
+                                        textStyle: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: _isSaving ? null : _saveOrgProfile,
+                                      icon: _isSaving
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Icon(Icons.save,
+                                              size: 22, color: Colors.white),
+                                      label: Text(
+                                        _isSaving ? 'Saving...' : 'Save Changes',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        backgroundColor: colorScheme.primary,
+                                        foregroundColor: Colors.white,
+                                        textStyle: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (!_isEditing) ...[
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => context.read<MyAuthProvider>().signOut(),
+                                  icon: const Icon(Icons.logout, size: 22, color: Colors.white),
+                                  label: const Text(
+                                    'Logout',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    backgroundColor: colorScheme.error,
+                                    foregroundColor: Colors.white,
+                                    textStyle: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
-                              icon: const Icon(Icons.edit),
-                              label: const Text('Edit Profile'),
-                            ),
-                          ),
+                            ],
+                          ],
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 8, horizontal: 8),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                if (!context.mounted) return; // mounted check
-                                context.read<MyAuthProvider>().signOut();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                foregroundColor:
-                                    Theme.of(context).colorScheme.onPrimary,
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primary,
-                              ),
-                              child: const Text('Log-out'),
-                            ),
-                          ),
-                        ),
-                      ]
-                    ],
-                  ),
-                ),
+                      ),
+                    );
+                  }
+                },
               ),
-      ),
-    );
+        ),
+      );
   }
 }

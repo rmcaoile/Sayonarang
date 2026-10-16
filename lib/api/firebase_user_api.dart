@@ -161,18 +161,23 @@ class FirebaseAuthAPI {
     List<String> addresses,
     String contactNum,
     bool isOpen,
+    String? profileImageUrl,
   ) async {
     try {
-      await db.collection("users").doc(orgId).update({
+      Map<String, dynamic> updateData = {
         "description": description,
         "addresses": addresses,
         "contactNum": contactNum,
         "isOpen": isOpen,
-      });
+      };
+      if (profileImageUrl != null) {
+        updateData["profileImageUrl"] = profileImageUrl;
+      }
+      await db.collection("users").doc(orgId).update(updateData);
 
       return "Successfully edited org org details!";
     } on FirebaseException catch (e) {
-      return "Failed with error '${e.code}: ${e.message}";
+      return "Failed with error '${e.code}: ${e.message}'";
     }
   }
 

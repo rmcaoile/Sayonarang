@@ -15,6 +15,7 @@ class DonorDriveDetailsPage extends StatefulWidget {
   final String userName;
   final String? profileImageUrl;
   final String status;
+  final bool showDonateButton;
 
   const DonorDriveDetailsPage({
     Key? key,
@@ -22,6 +23,7 @@ class DonorDriveDetailsPage extends StatefulWidget {
     required this.userName,
     this.profileImageUrl,
     this.status = '',
+    this.showDonateButton = false,
   }) : super(key: key);
 
   @override
@@ -320,33 +322,35 @@ class _DonorDriveDetailsPageState extends State<DonorDriveDetailsPage> {
                  ),
                ),
              ),
-             Padding(
-               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-               child: SizedBox(
-                 width: double.infinity,
-                 child: ElevatedButton(
-                   onPressed: () {
-                     // navigate to the create donation form page
-                     Navigator.push(
-                       context,
-                       MaterialPageRoute(
-                         builder: (context) =>
-                             const DonorDonationFormPage(mode: 'add'),
-                       ),
-                     );
-                   },
-                   style: ElevatedButton.styleFrom(
-                     foregroundColor:
-                         Theme.of(context).colorScheme.onPrimary,
-                     backgroundColor: Theme.of(context).colorScheme.primary,
-                   ),
-                   child: const Text('Donate Now'),
-                 ),
-               ),
-             ),
-           ],
-         ),
-       ),
-     );
-   }
-}
+
+              if (widget.showDonateButton)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        // navigate to the create donation form page
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                const DonorDonationFormPage(mode: 'add'),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                      ),
+                      child: const Text('Donate Now'),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+  }

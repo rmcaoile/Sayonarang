@@ -374,12 +374,13 @@ class _DonorOrgPageState extends State<DonorOrgPage> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => DonorDriveDetailsPage(
-                  drive: drive,
-                  userName: _selectedOrg!.name,
-                  profileImageUrl: _selectedOrg!.profileImageUrl,
-                  status: _selectedOrg!.status,
-                ),
+                    builder: (context) => DonorDriveDetailsPage(
+                      drive: drive,
+                      userName: _selectedOrg!.name,
+                      profileImageUrl: _selectedOrg!.profileImageUrl,
+                      status: _selectedOrg!.status,
+                      showDonateButton: true,
+                    ),
               ),
             );
           },

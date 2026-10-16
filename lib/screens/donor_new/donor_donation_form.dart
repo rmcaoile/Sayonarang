@@ -1,7 +1,8 @@
 import 'package:donation_app/models/donation_model.dart';
 import 'package:donation_app/providers/donation_provider.dart';
+import 'package:donation_app/providers/drive_provider.dart';
 import 'package:donation_app/providers/user_provider.dart';
-import 'package:donation_app/screens/donor_new/donor_drive_form.dart';
+import 'package:donation_app/screens/donor_new/donor_drive_details.dart';
 import 'package:donation_app/screens/donor_new/donor_qrcode.dart';
 import 'package:donation_app/screens/shared/image_viewer.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,6 +14,7 @@ import 'dart:convert';
 import 'package:donation_app/storage_config.dart';
 import "package:firebase_auth/firebase_auth.dart";
 import "package:donation_app/models/user_model.dart" as user_model;
+import "package:donation_app/models/drive_model.dart" as drive_model;
 
 // TODO: Add loading state for saving and loading image
 // TODO: Show details of organization before donating
@@ -1068,19 +1070,63 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                     ),
                   const SizedBox(height: 8),
                   // only show donation drive when status is not pending or cancelled
-                  if (_status != 'pending' && _status != 'cancelled') ...[
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  DonorDriveFormPage(mode: 'view')),
-                        );
-                      },
-                      child: const Text('Where is my donation going?'),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                    if (_status != 'pending' && _status != 'cancelled') ...[
+                      TextButton(
+                        onPressed: () async {
+                          try {
+                            if (_selectedDonation?.driveId == null ||
+                                _selectedDonation!.driveId!.isEmpty) {
+                              return;
+                            }
+
+                            final driveDoc = await context
+                                .read<DriveProvider>()
+                                .getDriveById(_selectedDonation!.driveId!);
+
+                            if (driveDoc.exists) {
+                              final drive = driveDoc.data() as Map<String, dynamic>;
+                              final orgDoc = await context
+                                  .read<MyAuthProvider>()
+                                  .getUserById(drive['orgId']);
+
+                              if (orgDoc.exists && context.mounted) {
+                                final org = orgDoc.data() as Map<String, dynamic>;
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => DonorDriveDetailsPage(
+                                      drive: drive_model.Drive.fromJson(
+                                        drive,
+                                      ),
+                                      userName: org['name'] ?? 'Organization',
+                                      profileImageUrl: org['profileImageUrl'],
+                                      status: org['status'] ?? '',
+                                      showDonateButton: false,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Drive details not found'),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text('Where is my donation going?'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                 ]
               ],
             ),

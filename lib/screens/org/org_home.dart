@@ -1,10 +1,10 @@
 import 'package:donation_app/screens/org/org_donation_form.dart';
+import 'package:donation_app/screens/donor_new/donation_card.dart';
 import 'package:flutter/material.dart';
 import 'package:donation_app/providers/user_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:donation_app/providers/donation_provider.dart';
 import 'package:donation_app/models/donation_model.dart';
 
@@ -110,77 +110,21 @@ class _OrgHomePageState extends State<OrgHomePage> {
   }
 
   Widget _buildDonationCard(Donation donation, String donorName) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: InkWell(
-        onTap: () {
-          // change selected donation
-          context.read<DonationProvider>().changeSelectedDonation(donation);
+    return DonationCard(
+      donation: donation,
+      orgName: donorName,
+      onTap: () {
+        // change selected donation
+        context.read<DonationProvider>().changeSelectedDonation(donation);
 
-          // navigate to the donation details page
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const OrgDonationFormPage(),
-            ),
-          );
-        },
-        child: Card(
-          surfaceTintColor: Colors.transparent,
-          child: ListTile(
-            title: Text(
-              donorName, // display the fetched donor name
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1, // limit name to one line
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text(
-                  'Donated on ${DateFormat('MMMM dd, yyyy').format(donation.timestamp)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  maxLines: 1, // limit date to one line
-                ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  // limit categories to be displayed to 3
-                  children: donation.categories.take(3).map((category) {
-                    return _buildTruncatedChip(category);
-                  }).toList(),
-                ),
-              ],
-            ),
-            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey),
+        // navigate to the donation details page
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const OrgDonationFormPage(),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTruncatedChip(String text) {
-    const maxLength = 20;
-    final truncatedText =
-        text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-
-    return Chip(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      label: Text(truncatedText),
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      side: BorderSide.none,
-      labelStyle: const TextStyle(color: Colors.white),
+        );
+      },
     );
   }
 

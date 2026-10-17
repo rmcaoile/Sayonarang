@@ -9,6 +9,7 @@ import '../../models/drive_model.dart';
 import '../../providers/admin_provider.dart';
 import '../../providers/donation_provider.dart';
 import '../../providers/drive_provider.dart';
+import '../../screens/donor_new/donation_card.dart';
 import '../../screens/shared/image_slider.dart';
 import '../../storage_config.dart';
 import 'admin_donation_details.dart';
@@ -416,72 +417,21 @@ class DriveDonationsList extends StatelessWidget {
                   String donorName =
                       donorData?['name'] ?? 'Unknown Organization';
 
-                  return Card(
-                    surfaceTintColor: Colors.transparent,
-                    elevation: 4,
-                    margin:
-                        const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    child: ListTile(
-                      leading: Icon(
-                        leadingIcon,
-                        color: statusColor,
-                      ),
-                      title: Text(
-                        donorName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 22,
+                  return DonationCard(
+                    donation: donation,
+                    orgName: donorName,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DonationDetailScreen(
+                            donation: donation,
+                            userName: donorName,
+                            userRole: 'org',
+                          ),
                         ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 5),
-                          Text(
-                            'Status: ${donation.status}',
-                            style: TextStyle(color: statusColor),
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: donation.categories
-                                .take(3) // Limit to three categories
-                                .map(
-                                  (category) => Container(
-                                    margin: const EdgeInsets.only(right: 8),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      category,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => DonationDetailScreen(
-                              donation: donation,
-                              userName: donorName,
-                              userRole: 'org',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                      );
+                    },
                   );
                 }
               },

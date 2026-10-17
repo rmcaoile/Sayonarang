@@ -52,6 +52,15 @@ class DonationCard extends StatelessWidget {
     }
   }
 
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'scheduled for pick-up':
+        return 'Scheduled';
+      default:
+        return status[0].toUpperCase() + status.substring(1);
+    }
+  }
+
   Widget _buildAvatar(BuildContext context) {
     final imageProvider = _getImageProvider();
     final colorScheme = Theme.of(context).colorScheme;
@@ -155,15 +164,14 @@ class DonationCard extends StatelessWidget {
                                 color: _getStatusColor(donation.status),
                                 borderRadius: BorderRadius.circular(64),
                               ),
-                              child: Text(
-                                donation.status[0].toUpperCase() +
-                                    donation.status.substring(1),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                                child: Text(
+                                  _getStatusLabel(donation.status),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
                             ),
                           ],
                         ),
@@ -202,10 +210,9 @@ class DonationCard extends StatelessWidget {
                                 fontSize: 14,
                                 color: colorScheme.onSurface.withValues(alpha: 0.8),
                               ),
-                              overflow: TextOverflow.ellipsis,
+                                overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(width: 25),
-                            // const Spacer(),
                             const Icon(
                               Icons.scale,
                               size: 14,
@@ -222,7 +229,6 @@ class DonationCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        // const SizedBox(height: 10),
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,

@@ -9,6 +9,7 @@ import '../../models/drive_model.dart';
 import '../../providers/donation_provider.dart';
 import '../../providers/drive_provider.dart';
 import '../../providers/admin_provider.dart';
+import '../../screens/donor_new/donation_card.dart';
 import '../../storage_config.dart';
 import 'admin_donation_details.dart';
 import 'admin_drive_details.dart';
@@ -119,35 +120,6 @@ class OrgDonationsList extends StatelessWidget {
 
   Widget _buildDonationListItem(
       BuildContext context, Donation donation, AdminProvider adminProvider) {
-    IconData leadingIcon;
-    Color statusColor;
-
-    switch (donation.status) {
-      case 'pending':
-        leadingIcon = Icons.remove_circle;
-        statusColor = Colors.orange;
-        break;
-      case 'confirmed':
-        leadingIcon = Icons.check_circle;
-        statusColor = Colors.blue;
-        break;
-      case 'scheduled for pick-up':
-        leadingIcon = Icons.check_circle;
-        statusColor = Colors.blue;
-        break;
-      case 'completed':
-        leadingIcon = Icons.check_circle;
-        statusColor = Colors.green;
-        break;
-      case 'cancelled':
-        leadingIcon = Icons.cancel;
-        statusColor = Colors.red;
-        break;
-      default:
-        leadingIcon = Icons.error;
-        statusColor = Colors.black;
-    }
-
     return FutureBuilder<DocumentSnapshot>(
       future: adminProvider.getDonorById(donation.donorId),
       builder: (context, donorSnapshot) {
@@ -205,70 +177,20 @@ class OrgDonationsList extends StatelessWidget {
           var donorData = donorSnapshot.data!.data() as Map<String, dynamic>?;
           String donorName = donorData?['name'] ?? 'Unknown Organization';
 
-          return Card(
-            surfaceTintColor: Colors.transparent,
-            elevation: 4,
-            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: ListTile(
-              leading: Icon(
-                leadingIcon,
-                color: statusColor,
-              ),
-              title: Text(
-                donorName,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+          return DonationCard(
+            donation: donation,
+            orgName: donorName,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DonationDetailScreen(
+                      donation: donation,
+                      userName: donorName,
+                      userRole: 'Organization'),
                 ),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 5),
-                  Text(
-                    'Status: ${donation.status}',
-                    style: TextStyle(color: statusColor),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: donation.categories
-                        .take(3) // Limit to three categories
-                        .map(
-                          (category) => Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              category,
-                              style: const TextStyle(
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DonationDetailScreen(
-                        donation: donation,
-                        userName: donorName,
-                        userRole: 'Organization'),
-                  ),
-                );
-              },
-            ),
+              );
+            },
           );
         }
       },

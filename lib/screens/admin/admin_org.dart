@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:donation_app/screens/donor_new/org_card.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/user_model.dart';
@@ -140,48 +141,23 @@ class _ViewOrganizationsState extends State<ViewOrganizations> {
             snapshot.data!.docs[index].data() as Map<String, dynamic>);
         org.id = snapshot.data!.docs[index].id;
 
-        return Card(
-          surfaceTintColor: Colors.transparent,
-          margin:
-              const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-          elevation: 4,
-          child: ListTile(
-              leading: const Icon(
-                Icons.access_time,
-                size: 40,
-                color: Colors.orange,
-              ),
-              title: Text(
-                org.name,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+        return OrgCard(
+          org: org,
+          onTap: () {
+            if (org.status == 'approved') {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => UserPage(user: org),
                 ),
-              ),
-              subtitle: Text(
-                org.username,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
+              );
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ViewOrgDetails(org: org),
                 ),
-              ),
-              trailing:
-                  const Icon(Icons.arrow_forward_ios, color: Colors.grey),
-              onTap: () {
-                if (org.status == 'approved') {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => UserPage(user: org),
-                    ),
-                  );
-                } else {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ViewOrgDetails(org: org),
-                    ),
-                  );
-                }
-              }),
+              );
+            }
+          },
         );
       },
     );
@@ -235,48 +211,23 @@ class _ViewOrganizationsState extends State<ViewOrganizations> {
                 snapshot.data!.docs[index].data() as Map<String, dynamic>);
             org.id = snapshot.data!.docs[index].id;
 
-            return Card(
-              surfaceTintColor: Colors.transparent,
-              margin:
-                  const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-              elevation: 4,
-              child: ListTile(
-                  leading: Icon(
-                    icon,
-                    size: 40,
-                    color: iconColor,
-                  ),
-                  title: Text(
-                    org.name,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
+            return OrgCard(
+              org: org,
+              onTap: () {
+                if (org.status == 'approved') {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => UserPage(user: org),
                     ),
-                  ),
-                  subtitle: Text(
-                    org.username,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
+                  );
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ViewOrgDetails(org: org),
                     ),
-                  ),
-                  trailing:
-                      const Icon(Icons.arrow_forward_ios, color: Colors.grey),
-                  onTap: () {
-                    if (org.status == 'approved') {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => UserPage(user: org),
-                        ),
-                      );
-                    } else {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => ViewOrgDetails(org: org),
-                        ),
-                      );
-                    }
-                  }),
+                  );
+                }
+              },
             );
           },
         );

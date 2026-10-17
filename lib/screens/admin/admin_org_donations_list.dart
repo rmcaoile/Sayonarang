@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +9,7 @@ import '../../models/drive_model.dart';
 import '../../providers/donation_provider.dart';
 import '../../providers/drive_provider.dart';
 import '../../providers/admin_provider.dart';
+import '../../storage_config.dart';
 import 'admin_donation_details.dart';
 import 'admin_drive_details.dart';
 
@@ -281,7 +284,7 @@ class OrgDonationsList extends StatelessWidget {
           return Card(
             surfaceTintColor: Colors.transparent,
             elevation: 4,
-            margin: const EdgeInsets.all(8.0),
+            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: ListTile(
@@ -308,7 +311,7 @@ class OrgDonationsList extends StatelessWidget {
           return Card(
             surfaceTintColor: Colors.transparent,
             elevation: 4,
-            margin: const EdgeInsets.all(8.0),
+            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: ListTile(
@@ -334,29 +337,21 @@ class OrgDonationsList extends StatelessWidget {
         } else {
           var orgData = orgSnapshot.data!.data() as Map<String, dynamic>?;
           String orgName = orgData?['name'] ?? 'Unknown Organization';
+          final bool isEnded = drive.endDate.isBefore(DateTime.now());
+          final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
           return Card(
             surfaceTintColor: Colors.transparent,
-            elevation: 4,
-            margin: const EdgeInsets.all(8.0),
-            child: ListTile(
-              leading: const Icon(Icons.handshake, color: Colors.blue),
-              title: Text(
-                drive.title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+            elevation: 2,
+            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: colorScheme.outline.withValues(alpha: 0.35),
+                width: 1,
               ),
-              trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey),
-              subtitle: Text(
-                'Description: ${drive.description}',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey[700],
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+            ),
+            child: InkWell(
               onTap: () {
                 Navigator.push(
                   context,
@@ -368,10 +363,136 @@ class OrgDonationsList extends StatelessWidget {
                   ),
                 );
               },
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDriveThumbnail(context, drive),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            drive.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            drive.description,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF666666),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              if (drive.photos.isNotEmpty) ...[
+                                const Icon(
+                                  Icons.photo_outlined,
+                                  size: 14,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${drive.photos.length}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isEnded
+                                      ? Colors.grey.shade200
+                                      : colorScheme.primary.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  isEnded ? 'Ended' : 'Ongoing',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isEnded
+                                        ? Colors.grey.shade700
+                                        : colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
         }
       },
+    );
+  }
+
+  Widget _buildDriveThumbnail(BuildContext context, Drive drive) {
+    if (drive.photos.isEmpty) {
+      return _driveThumbnailPlaceholder();
+    }
+
+    return FutureBuilder<List<String>>(
+      future: context.read<DriveProvider>().fetchDownloadURLsForImages(
+          drive.photos.take(1).toList()),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            snapshot.hasError ||
+            !snapshot.hasData ||
+            snapshot.data!.isEmpty) {
+          return _driveThumbnailPlaceholder();
+        }
+
+        final image = snapshot.data!.first;
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image(
+            image: StorageConfig.useFirebaseStorage
+                ? NetworkImage(image)
+                : MemoryImage(base64Decode(image)) as ImageProvider,
+            width: 88,
+            height: 88,
+            fit: BoxFit.cover,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _driveThumbnailPlaceholder() {
+    return Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.image, color: Colors.grey),
     );
   }
 }

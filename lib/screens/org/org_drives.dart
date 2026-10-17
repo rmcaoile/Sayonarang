@@ -1,8 +1,10 @@
+import 'dart:convert';
+
 import 'package:donation_app/models/drive_model.dart';
 import 'package:donation_app/providers/user_provider.dart';
 import 'package:donation_app/screens/org/org_drive_form.dart';
+import 'package:donation_app/storage_config.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -143,9 +145,16 @@ class _OrgDrivesPageState extends State<OrgDrivesPage> {
 
     if (filteredDrives.isEmpty) {
       return Center(
-        child: Text(
-          'No ${isOngoing ? "ongoing" : "finished"} drives yet!',
-          style: const TextStyle(fontSize: 18),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event_busy, color: Colors.grey, size: 48),
+            SizedBox(height: 8),
+            Text(
+              'No ${isOngoing ? "ongoing" : "finished"} drives yet!',
+              style: const TextStyle(fontSize: 18),
+            ),
+          ],
         ),
       );
     }
@@ -160,59 +169,160 @@ class _OrgDrivesPageState extends State<OrgDrivesPage> {
   }
 
   Widget _buildDriveCard(Drive drive) {
-    bool isEnded = drive.endDate.isBefore(DateTime.now());
+    final bool isEnded = drive.endDate.isBefore(DateTime.now());
+    final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+    return Card(
+      surfaceTintColor: Colors.transparent,
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: colorScheme.outline.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
       child: InkWell(
-        onTap: () {
-          // change selected drive
-          context.read<DriveProvider>().changeSelectedDrive(drive);
+          onTap: () {
+            // change selected drive
+            context.read<DriveProvider>().changeSelectedDrive(drive);
 
-          // navigate to the drive form page with view as mode
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const OrgDriveFormPage(mode: "view"),
-            ),
-          );
-        },
-        child: Card(
-          surfaceTintColor: Colors.transparent,
-          child: ListTile(
-            title: Text(
-              drive.title,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+            // navigate to the drive form page with view as mode
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OrgDriveFormPage(mode: "view"),
               ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-            subtitle: Column(
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
-                Text(
-                  '${isEnded ? 'Ended' : 'Ends'} on ${DateFormat('MMMM dd, yyyy').format(drive.endDate)}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
+                _buildDriveThumbnail(drive),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        drive.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        drive.description,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF666666),
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (drive.photos.isNotEmpty) ...[
+                            const Icon(
+                              Icons.photo_outlined,
+                              size: 14,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${drive.photos.length}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isEnded
+                                  ? Colors.grey.shade200
+                                  : colorScheme.primary.withValues(
+                                      alpha: 0.12,
+                                    ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              isEnded ? 'Ended' : 'Ongoing',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isEnded
+                                    ? Colors.grey.shade700
+                                    : colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  drive.description,
-                  style: const TextStyle(fontSize: 16),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
-            trailing: const Icon(Icons.arrow_forward_ios, color: Colors.grey),
           ),
         ),
+      );
+  }
+
+  Widget _buildDriveThumbnail(Drive drive) {
+    if (drive.photos.isEmpty) {
+      return _driveThumbnailPlaceholder();
+    }
+
+    return FutureBuilder<List<String>>(
+      future: context.read<DriveProvider>().fetchDownloadURLsForImages(
+          drive.photos.take(1).toList()),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting ||
+            snapshot.hasError ||
+            !snapshot.hasData ||
+            snapshot.data!.isEmpty) {
+          return _driveThumbnailPlaceholder();
+        }
+
+        final image = snapshot.data!.first;
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image(
+            image: StorageConfig.useFirebaseStorage
+                ? NetworkImage(image)
+                : MemoryImage(base64Decode(image)) as ImageProvider,
+            width: 88,
+            height: 88,
+            fit: BoxFit.cover,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _driveThumbnailPlaceholder() {
+    return Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
       ),
+      child: const Icon(Icons.image, color: Colors.grey),
     );
   }
 }

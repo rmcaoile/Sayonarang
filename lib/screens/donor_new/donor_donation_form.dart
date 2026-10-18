@@ -48,6 +48,8 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
 
   Donation? _selectedDonation;
   user_model.User? _selectedOrg;
+  String _orgName = 'Organization';
+  String? _orgProfileImageUrl;
   bool get isViewMode => widget.mode == 'view';
   final _formKey = GlobalKey<FormState>();
 
@@ -80,6 +82,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
       _timestamp = _selectedDonation!.timestamp;
 
       _loadDownloadURLs();
+      _loadOrgDetails();
     } else {
       // only fetch selected organization when creating a new donation
       _selectedOrg = context.read<MyAuthProvider>().selected;
@@ -135,6 +138,19 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
         }
       }
     }
+  }
+
+  Future<void> _loadOrgDetails() async {
+    try {
+      final details = await context
+          .read<MyAuthProvider>()
+          .getUserDetails(_selectedDonation!.orgId);
+      if (!mounted) return;
+      setState(() {
+        _orgName = details['name'] as String? ?? 'Organization';
+        _orgProfileImageUrl = details['profileImageUrl'] as String?;
+      });
+    } catch (_) {}
   }
 
   Future<void> _pickImageFromGallery() async {
@@ -260,6 +276,35 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
     if (pickedTime != null) {
       controller.text = pickedTime.format(context);
     }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending': return Colors.orange;
+      case 'confirmed': return Colors.blue;
+      case 'scheduled for pick-up': return Colors.purple;
+      case 'completed': return Colors.green;
+      case 'cancelled': return Colors.grey;
+      default: return Colors.black;
+    }
+  }
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'scheduled for pick-up': return 'Scheduled';
+      default: return status[0].toUpperCase() + status.substring(1);
+    }
+  }
+  String _getInitials(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    final first = words.isNotEmpty ? words.first : '';
+    final second = words.length > 1 ? words[1] : '';
+    return ((first.isNotEmpty ? first[0] : '') + (second.isNotEmpty ? second[0] : '')).toUpperCase();
+  }
+  ImageProvider? _getOrgImageProvider() {
+    final url = _orgProfileImageUrl;
+    if (url == null || url.isEmpty) return null;
+    if (StorageConfig.useFirebaseStorage) return NetworkImage(url);
+    return MemoryImage(base64Decode(url));
   }
 
   Widget _buildImageContainer() {
@@ -494,10 +539,12 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
           ),
         )),
         body: SingleChildScrollView(
+          padding: isViewMode ? const EdgeInsets.all(16.0) : EdgeInsets.zero,
           child: Form(
             key: _formKey,
             child: Column(
               children: [
+                if (!isViewMode)
                 Padding(
                     padding:
                         const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -622,6 +669,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                               );
                             }).toList()
                         ])),
+                if (!isViewMode)
                 Row(
                   children: [
                     Expanded(
@@ -663,6 +711,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                     const SizedBox(width: 16),
                   ],
                 ),
+                if (!isViewMode)
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -703,7 +752,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                     ],
                   ),
                 ),
-                if (_mode == 'Pick-up') ...[
+                if (!isViewMode && _mode == 'Pick-up') ...[
                   ..._addressControllers.map((controller) {
                     final int index = _addressControllers.indexOf(controller);
                     return Row(
@@ -764,6 +813,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                     },
                   ),
                 ],
+                if (!isViewMode)
                 _buildFormField(
                   context: context,
                   type: 'date',
@@ -780,6 +830,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                   suffixIcon: const Icon(Icons.calendar_today),
                 ),
                 const SizedBox(height: 8),
+                if (!isViewMode)
                 _buildFormField(
                   context: context,
                   type: 'time',
@@ -952,7 +1003,92 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                   ),
                 ],
                 if (isViewMode) ...[
-                  _buildImageContainer(),
+                  Builder(builder: (context) {
+                    final colorScheme = Theme.of(context).colorScheme;
+                    final donation = _selectedDonation!;
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.shadow.withValues(alpha: 0.1),
+                            spreadRadius: 0,
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 52,
+                                backgroundColor: colorScheme.primary,
+                                backgroundImage: _getOrgImageProvider(),
+                                child: _getOrgImageProvider() == null
+                                    ? Text(_getInitials(_orgName), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white))
+                                    : null,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text('Organization:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                                    const SizedBox(height: 4),
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 4),
+                                      child: Text(_orgName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(color: _getStatusColor(donation.status), borderRadius: BorderRadius.circular(64)),
+                                child: Text(_getStatusLabel(donation.status), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 30),
+                          Text('Categories', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 8),
+                          ...donation.categories.map((c) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [Icon(Icons.category, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text(c, style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]))),
+                          const SizedBox(height: 15),
+                          Text('Mode', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 4),
+                          Row(children: [Icon(Icons.local_shipping, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text(donation.mode, style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]),
+                          const SizedBox(height: 15),
+                          Text('Weight', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 4),
+                          Row(children: [Icon(Icons.scale, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text('${donation.weight} ${donation.weightUnit}', style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]),
+                          const SizedBox(height: 15),
+                          if (donation.mode == 'Pick-up') ...[
+                            Text('Contact Number', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                            const SizedBox(height: 4),
+                            Row(children: [Icon(Icons.phone, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text(donation.contactNum, style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]),
+                            const SizedBox(height: 15),
+                          ],
+                          Text('Date', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 4),
+                          Row(children: [Icon(Icons.calendar_today, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text(DateFormat('MMMM dd, yyyy').format(donation.date), style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]),
+                          const SizedBox(height: 15),
+                          Text('Image', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 8),
+                          _buildImageContainer(),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 16),
                   if (_mode == 'Drop-off')
                     Padding(
                       padding: const EdgeInsets.symmetric(

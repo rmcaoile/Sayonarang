@@ -62,86 +62,72 @@ class _DonorDriveDetailsPageState extends State<DonorDriveDetailsPage> {
 
   Widget _buildImageGrid() {
     if (_isLoadingImages) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.0),
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_photosDownloadURLs.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.0),
-        child: Center(
-          child: Text(
-            'No images available',
-            style: TextStyle(
-              fontStyle: FontStyle.italic,
-              color: Colors.grey,
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.photo_library_outlined, size: 48, color: Colors.grey),
+            SizedBox(height: 8),
+            Text(
+              'No images available',
+              style: TextStyle(color: Colors.grey),
             ),
-          ),
+          ],
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Images",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12.0),
-            color: Colors.grey[200],
-          ),
-          height: 200,
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 4.0,
-                mainAxisSpacing: 4.0,
-              ),
-              itemCount: _photosDownloadURLs.length,
-              itemBuilder: (context, index) {
-                final image = _photosDownloadURLs[index];
-                return InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => SliderShowFullmages(
-                          listImagesModel: _photosDownloadURLs,
-                          current: index,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      image: DecorationImage(
-                        image: StorageConfig.useFirebaseStorage
-                            ? NetworkImage(image)
-                            : MemoryImage(base64Decode(image))
-                                as ImageProvider,
-                        fit: BoxFit.cover,
+    final crossAxisCount = _photosDownloadURLs.length <= 3 ? 2 : 3;
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 8.0,
+        mainAxisSpacing: 8.0,
+        childAspectRatio: 4 / 3,
+      ),
+      itemCount: _photosDownloadURLs.length,
+      itemBuilder: (context, index) {
+        final image = _photosDownloadURLs[index];
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => SliderShowFullmages(
+                        listImagesModel: _photosDownloadURLs,
+                        current: index,
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+                child: StorageConfig.useFirebaseStorage
+                    ? Image.network(
+                        image,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      )
+                    : Image.memory(
+                        base64Decode(image),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -315,6 +301,14 @@ class _DonorDriveDetailsPageState extends State<DonorDriveDetailsPage> {
                           ],
                         ),
                         const SizedBox(height: 20),
+                        const Text(
+                          "Images",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         _buildImageGrid(),
                       ],
                     ),

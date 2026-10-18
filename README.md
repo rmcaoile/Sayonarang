@@ -139,4 +139,10 @@ flutter build apk
     - Use the logout button to sign out.
 
 
-<!-- TODO: code cleanup; convert to component repeated elements -->
+<!-- TODO: code cleanup
+        convert to component repeated elements 
+            - Donation Card and Details
+            - Drive Cart and Details
+            - Org Card
+            - Account Details
+-->

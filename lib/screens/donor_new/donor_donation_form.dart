@@ -308,11 +308,10 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
   }
 
   Widget _buildImageContainer() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!isViewMode)
           const Text(
             "Image (optional)",
             style: TextStyle(
@@ -320,84 +319,81 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
               fontSize: 18,
             ),
           ),
-          const SizedBox(height: 8),
-          if (_photoDownloadURL != '' || _selectedPhoto != null)
-            Stack(
-              children: [
-                InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => ShowFullImage(
-                          image: _photoDownloadURL != ''
-                              ? _photoDownloadURL
-                              : _selectedPhoto,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      image: DecorationImage(
+        const SizedBox(height: 8),
+        if (_photoDownloadURL != '' || _selectedPhoto != null)
+          Stack(
+            children: [
+              InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ShowFullImage(
                         image: _photoDownloadURL != ''
-                            ? (StorageConfig.useFirebaseStorage
-                                ? NetworkImage(_photoDownloadURL)
-                                : MemoryImage(
-                                        base64Decode(_photoDownloadURL))
-                                    as ImageProvider<Object>)
-                            : FileImage(_selectedPhoto!)
-                                as ImageProvider<Object>,
-                        fit: BoxFit.cover,
+                            ? _photoDownloadURL
+                            : _selectedPhoto,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    image: DecorationImage(
+                      image: _photoDownloadURL != ''
+                          ? (StorageConfig.useFirebaseStorage
+                              ? NetworkImage(_photoDownloadURL)
+                              : MemoryImage(base64Decode(_photoDownloadURL))
+                                  as ImageProvider<Object>)
+                          : FileImage(_selectedPhoto!) as ImageProvider<Object>,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+              if (!isViewMode)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _photo = '';
+                        _deletedPhoto = _photoDownloadURL;
+                        _photoDownloadURL = '';
+                        _selectedPhoto = null;
+                      });
+                    },
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.red,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
                       ),
                     ),
                   ),
                 ),
-                if (!isViewMode)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _photo = '';
-                          _deletedPhoto = _photoDownloadURL;
-                          _photoDownloadURL = '';
-                          _selectedPhoto = null;
-                        });
-                      },
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.red,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+            ],
+          ),
+        if (_photoDownloadURL == '' && _selectedPhoto == null)
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12.0),
+              color: Colors.grey[200],
             ),
-          if (_photoDownloadURL == '' && _selectedPhoto == null)
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12.0),
-                color: Colors.grey[200],
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.image,
-                  color: Colors.grey[400],
-                  size: 48,
-                ),
+            child: Center(
+              child: Icon(
+                Icons.image,
+                color: Colors.grey[400],
+                size: 48,
               ),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 
@@ -1025,36 +1021,44 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                          Stack(
                             children: [
-                              CircleAvatar(
-                                radius: 52,
-                                backgroundColor: colorScheme.primary,
-                                backgroundImage: _getOrgImageProvider(),
-                                child: _getOrgImageProvider() == null
-                                    ? Text(_getInitials(_orgName), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white))
-                                    : null,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('Organization:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
-                                    const SizedBox(height: 4),
-                                    Padding(
-                                      padding: const EdgeInsets.only(left: 4),
-                                      child: Text(_orgName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 52,
+                                    backgroundColor: colorScheme.primary,
+                                    backgroundImage: _getOrgImageProvider(),
+                                    child: _getOrgImageProvider() == null
+                                        ? Text(_getInitials(_orgName), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white))
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text('Organization:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                                        const SizedBox(height: 4),
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 4),
+                                          child: Text(_orgName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: _getStatusColor(donation.status), borderRadius: BorderRadius.circular(64)),
-                                child: Text(_getStatusLabel(donation.status), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(color: _getStatusColor(donation.status), borderRadius: BorderRadius.circular(64)),
+                                  child: Text(_getStatusLabel(donation.status), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                                ),
                               ),
                             ],
                           ),

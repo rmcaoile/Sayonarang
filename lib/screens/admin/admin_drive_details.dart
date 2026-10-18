@@ -428,6 +428,7 @@ class DriveDonationsList extends StatelessWidget {
                             donation: donation,
                             userName: donorName,
                             userRole: 'org',
+                            profileImageUrl: donorData?['profileImageUrl'],
                           ),
                         ),
                       );

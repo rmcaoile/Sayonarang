@@ -133,6 +133,7 @@ class DonorDonationsList extends StatelessWidget {
                             donation: donation,
                             userName: orgName,
                             userRole: 'Donor',
+                            profileImageUrl: orgData?['profileImageUrl'],
                           ),
                         ),
                       );

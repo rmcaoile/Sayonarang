@@ -187,7 +187,8 @@ class OrgDonationsList extends StatelessWidget {
                   builder: (context) => DonationDetailScreen(
                       donation: donation,
                       userName: donorName,
-                      userRole: 'Organization'),
+                      userRole: 'Organization',
+                      profileImageUrl: donorData?['profileImageUrl']),
                 ),
               );
             },

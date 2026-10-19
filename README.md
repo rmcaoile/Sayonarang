@@ -138,3 +138,12 @@ flutter build apk
     - View the admin details (including information about the developers of the app).
     - Use the logout button to sign out.
 
+
+<!-- TODO: code cleanup
+        convert to component repeated elements 
+            - Donation Card and Details
+            - Drive Cart and Details
+            - Org Card
+            - Account Details
+        fix loading screens
+-->

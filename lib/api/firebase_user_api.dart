@@ -161,18 +161,23 @@ class FirebaseAuthAPI {
     List<String> addresses,
     String contactNum,
     bool isOpen,
+    String? profileImageUrl,
   ) async {
     try {
-      await db.collection("users").doc(orgId).update({
+      Map<String, dynamic> updateData = {
         "description": description,
         "addresses": addresses,
         "contactNum": contactNum,
         "isOpen": isOpen,
-      });
+      };
+      if (profileImageUrl != null) {
+        updateData["profileImageUrl"] = profileImageUrl;
+      }
+      await db.collection("users").doc(orgId).update(updateData);
 
       return "Successfully edited org org details!";
     } on FirebaseException catch (e) {
-      return "Failed with error '${e.code}: ${e.message}";
+      return "Failed with error '${e.code}: ${e.message}'";
     }
   }
 
@@ -193,6 +198,31 @@ class FirebaseAuthAPI {
       return userDoc;
     } on FirebaseException catch (e) {
       throw Exception("Failed to retrieve user: ${e.message}");
+    }
+  }
+
+  Future<String> updateDonorProfile(
+    String? userId,
+    String name,
+    String username,
+    String contactNum,
+    List<String> addresses,
+    String? profileImageUrl,
+  ) async {
+    try {
+      Map<String, dynamic> updateData = {
+        "name": name,
+        "username": username,
+        "contactNum": contactNum,
+        "addresses": addresses,
+      };
+      if (profileImageUrl != null) {
+        updateData["profileImageUrl"] = profileImageUrl;
+      }
+      await db.collection("users").doc(userId).update(updateData);
+      return "Successfully updated donor profile!";
+    } on FirebaseException catch (e) {
+      return "Failed with error '${e.code}: ${e.message}'";
     }
   }
 }

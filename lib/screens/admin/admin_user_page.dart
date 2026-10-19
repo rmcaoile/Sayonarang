@@ -27,9 +27,9 @@ class _UserPageState extends State<UserPage> {
               color: Color(0xFFF54741),
             ),
           ),
-          backgroundColor: Colors.white,
           iconTheme: const IconThemeData(color: Color(0xFFF54741)),
           bottom: TabBar(
+            dividerColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
             tabs: [
               widget.user.role == 'org'
                   ? const Tab(text: 'Donation Drives')

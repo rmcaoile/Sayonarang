@@ -4,6 +4,9 @@ import 'package:donation_app/models/drive_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
+import 'package:donation_app/utils/image_compression.dart';
 
 class DriveProvider with ChangeNotifier {
   late FirebaseDriveAPI firebaseService;
@@ -60,21 +63,29 @@ class DriveProvider with ChangeNotifier {
 
   Future<String> uploadFile(File file) async {
     try {
-      // get reference to firebase storage
-      final storageRef = FirebaseStorage.instance.ref();
+      if (StorageConfig.useFirebaseStorage) {
+        // get reference to firebase storage
+        final storageRef = FirebaseStorage.instance.ref();
 
-      // get filename of the image
-      final fileName = file.path.split("/").last;
-      final timestamp = DateTime.now().microsecondsSinceEpoch;
+        // get filename of the image
+        final fileName = file.path.split("/").last;
+        final timestamp = DateTime.now().microsecondsSinceEpoch;
 
-      // define the path in the storage
-      final uploadRef = storageRef.child("drive/$timestamp-$fileName");
-      await uploadRef.putFile(file);
-      print('Successfully uploaded file');
-      return '$timestamp-$fileName';
+        // define the path in the storage
+        final uploadRef = storageRef.child("drive/$timestamp-$fileName");
+        await uploadRef.putFile(file);
+        print('Successfully uploaded file');
+        return '$timestamp-$fileName';
+      }
+
+      // base64 in Firestore
+      final compressedBytes = await ImageCompressionUtil.compressImage(file);
+      final base64Image = base64Encode(compressedBytes);
+      print('Successfully compressed and converted file to base64');
+      return base64Image;
     } catch (e) {
       print(e);
-      return 'error';
+      return '';
     }
   }
 
@@ -82,55 +93,78 @@ class DriveProvider with ChangeNotifier {
     List<String> uploadedPaths = [];
 
     try {
-      // Get reference to Firebase Storage
-      final storageRef = FirebaseStorage.instance.ref();
+      if (StorageConfig.useFirebaseStorage) {
+        // Get reference to Firebase Storage
+        final storageRef = FirebaseStorage.instance.ref();
 
-      // Upload each file in the list
+        // Upload each file in the list
+        for (File file in files) {
+          // Get filename of the image
+          final fileName = file.path.split("/").last;
+          final timestamp = DateTime.now().microsecondsSinceEpoch;
+
+          // Define the path in the storage
+          final uploadRef = storageRef.child("drives/$timestamp-$fileName");
+
+          // Upload file to Firebase Storage
+          await uploadRef.putFile(file);
+
+          // Add uploaded file path to the list
+          uploadedPaths.add('$timestamp-$fileName');
+          print('Successfully uploaded file: $fileName');
+        }
+
+        return uploadedPaths;
+      }
+
+      // base64 in Firestore
       for (File file in files) {
-        // Get filename of the image
-        final fileName = file.path.split("/").last;
-        final timestamp = DateTime.now().microsecondsSinceEpoch;
-
-        // Define the path in the storage
-        final uploadRef = storageRef.child("drives/$timestamp-$fileName");
-
-        // Upload file to Firebase Storage
-        await uploadRef.putFile(file);
-
-        // Add uploaded file path to the list
-        uploadedPaths.add('$timestamp-$fileName');
-        print('Successfully uploaded file: $fileName');
+        final compressedBytes = await ImageCompressionUtil.compressImage(file);
+        final base64Image = base64Encode(compressedBytes);
+        uploadedPaths.add(base64Image);
+        print('Successfully compressed and converted file to base64');
       }
 
       return uploadedPaths;
     } catch (e) {
       print(e);
-      return ['error'];
+      return [];
     }
   }
 
   Future<void> deleteFiles(List<String> fileUrls) async {
-    try {
-      final storageRef = FirebaseStorage.instance.ref();
-      for (String fileUrl in fileUrls) {
-        final fileRef = storageRef.storage.refFromURL(fileUrl);
-        await fileRef.delete();
-        print('Successfully deleted file: $fileUrl');
+    if (StorageConfig.useFirebaseStorage) {
+      try {
+        final storageRef = FirebaseStorage.instance.ref();
+        for (String fileUrl in fileUrls) {
+          final fileRef = storageRef.storage.refFromURL(fileUrl);
+          await fileRef.delete();
+          print('Successfully deleted file: $fileUrl');
+        }
+      } catch (e) {
+        print(e);
       }
-    } catch (e) {
-      print(e);
+      return;
     }
+    // 
   }
 
   Future<List<String>> fetchDownloadURLsForImages(
-      List<String> filenames) async {
+      List<String> photos) async {
     List<String> downloadURLs = [];
-    for (String filename in filenames) {
-      String downloadURL = await FirebaseStorage.instance
-          .ref()
-          .child('drives/$filename')
-          .getDownloadURL();
-      downloadURLs.add(downloadURL);
+    if (StorageConfig.useFirebaseStorage) {
+      for (String photo in photos) {
+        String downloadURL = await FirebaseStorage.instance
+            .ref()
+            .child('drives/$photo')
+            .getDownloadURL();
+        downloadURLs.add(downloadURL);
+      }
+      return downloadURLs;
+    }
+    // base64 strings stored in Firestore; return as-is
+    for (String photo in photos) {
+      downloadURLs.add(photo);
     }
     return downloadURLs;
   }

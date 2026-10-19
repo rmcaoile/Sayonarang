@@ -11,8 +11,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
-
-// TODO: Add loading state for saving and loading image
+import 'dart:async';
+import 'package:donation_app/storage_config.dart';
+import 'package:donation_app/providers/user_provider.dart';
 
 class OrgDonationFormPage extends StatefulWidget {
   const OrgDonationFormPage({super.key});
@@ -36,10 +37,13 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
   late String _photo;
   late String _photoDownloadURL;
   late String _status;
-  // late DateTime _timestamp;
+
+  StreamSubscription? _drivesSubscription;
 
   Donation? _selectedDonation;
   String? _driveTitle;
+  String _donorName = 'Donor';
+  String? _donorProfileImageUrl;
   bool get isViewMode => true;
   final _formKey = GlobalKey<FormState>();
 
@@ -68,14 +72,28 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
     _photo = _selectedDonation!.photo;
     _photoDownloadURL = '';
     _status = _selectedDonation!.status;
-    // _timestamp = _selectedDonation!.timestamp;
 
     _loadDownloadURLs();
     _loadDriveTitle();
+    _loadDonorDetails();
+  }
+
+  Future<void> _loadDonorDetails() async {
+    try {
+      final details = await context
+          .read<MyAuthProvider>()
+          .getUserDetails(_selectedDonation!.donorId);
+      if (!mounted) return;
+      setState(() {
+        _donorName = details['name'] as String? ?? 'Donor';
+        _donorProfileImageUrl = details['profileImageUrl'] as String?;
+      });
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _drivesSubscription?.cancel();
     _otherCategoriesController.dispose();
     _weightController.dispose();
     for (var controller in _addressControllers) {
@@ -89,12 +107,23 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
 
   Future<void> _loadDownloadURLs() async {
     if (_photo != '') {
-      String downloadURL = await context
-          .read<DonationProvider>()
-          .fetchDownloadURLForImage(_photo);
-      setState(() {
-        _photoDownloadURL = downloadURL;
-      });
+      if (StorageConfig.useFirebaseStorage) {
+        final downloadURL = await context
+            .read<DonationProvider>()
+            .fetchDownloadURLForImage(_photo);
+        setState(() {
+          _photoDownloadURL = downloadURL;
+        });
+      } else {
+        try {
+          base64Decode(_photo);
+          setState(() {
+            _photoDownloadURL = _photo;
+          });
+        } catch (e) {
+          print('Invalid base64 image data in donation: $e');
+        }
+      }
     }
   }
 
@@ -108,6 +137,9 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
   }
 
   Future<void> _showDonationDrivesModal(BuildContext context) async {
+    // cancel any existing subscription before creating a new one
+    _drivesSubscription?.cancel();
+
     // fetch drives
     context.read<DriveProvider>().fetchDrivesByOrg(_currentUser!.uid);
 
@@ -129,7 +161,7 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
     // );
 
     // listen to the stream for changes
-    drivesStream.listen((QuerySnapshot snapshot) {
+    _drivesSubscription = drivesStream.listen((QuerySnapshot snapshot) {
       // convert data from drives stream to a list
       List<Drive> drives = snapshot.docs.map((doc) {
         Drive drive = Drive.fromJson(doc.data() as Map<String, dynamic>);
@@ -196,6 +228,9 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
                       context
                           .read<DonationProvider>()
                           .editAndLink("confirmed", drive.id!);
+
+                      // cancel subscription to prevent further stream events
+                      _drivesSubscription?.cancel();
 
                       Navigator.of(context)
                         ..pop()
@@ -334,135 +369,169 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
     }
   }
 
-  Widget _buildImageContainer() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Image (optional)",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-            ),
-          ),
-          const SizedBox(height: 8),
-          if (_photoDownloadURL != '')
-            InkWell(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ShowFullImage(
-                      image: _photoDownloadURL,
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  image: DecorationImage(
-                    image: NetworkImage(_photoDownloadURL),
-                    fit: BoxFit.cover,
-                  ),
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return Colors.orange;
+      case 'confirmed':
+        return Colors.blue;
+      case 'scheduled for pick-up':
+        return Colors.purple;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.grey;
+      default:
+        return Colors.black;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'scheduled for pick-up':
+        return 'Scheduled';
+      default:
+        return status[0].toUpperCase() + status.substring(1);
+    }
+  }
+
+  String _getInitials(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    final first = words.isNotEmpty ? words.first : '';
+    final second = words.length > 1 ? words[1] : '';
+    return ((first.isNotEmpty ? first[0] : '') +
+            (second.isNotEmpty ? second[0] : ''))
+        .toUpperCase();
+  }
+
+  ImageProvider? _getImageProvider() {
+    final url = _donorProfileImageUrl;
+    if (url == null || url.isEmpty) return null;
+    if (StorageConfig.useFirebaseStorage) {
+      return NetworkImage(url);
+    }
+    return MemoryImage(base64Decode(url));
+  }
+
+  Widget _buildAvatar(BuildContext context) {
+    final imageProvider = _getImageProvider();
+    final colorScheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: imageProvider == null
+          ? null
+          : () {
+              final url = _donorProfileImageUrl!;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ShowFullImage(image: url),
                 ),
-              ),
-            ),
-          if (_photoDownloadURL == '')
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12.0),
-                color: Colors.grey[200],
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.image,
-                  color: Colors.grey[400],
-                  size: 48,
+              );
+            },
+      child: CircleAvatar(
+        radius: 52,
+        backgroundColor: colorScheme.primary,
+        backgroundImage: imageProvider,
+        child: imageProvider == null
+            ? Text(
+                _getInitials(_donorName),
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
-              ),
-            ),
-        ],
+              )
+            : null,
       ),
     );
   }
 
-  Widget _buildFormField({
-    required BuildContext context,
-    required String type, // text, date, time
-    required String label,
-    required TextEditingController controller,
-    required bool enabled,
-    required String? Function(String?) validator,
-    int minLines = 1,
-    int? maxLines,
-    Widget? suffixIcon,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+  Widget _buildStatusBadge(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: _getStatusColor(status),
+        borderRadius: BorderRadius.circular(64),
+      ),
+      child: Text(
+        _getStatusLabel(status),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String label, BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Text(
+      label,
+      style: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: colorScheme.onSurface.withValues(alpha: 0.6),
+      ),
+    );
+  }
+
+  Widget _buildValueRow(String value, IconData icon,
+      {required BuildContext context}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isEmpty = value.isEmpty;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            isEmpty ? 'Not set' : value,
+            style: TextStyle(
+              fontSize: 16,
+              color: isEmpty
+                  ? colorScheme.onSurface.withValues(alpha: 0.4)
+                  : colorScheme.onSurface,
+              fontStyle: isEmpty ? FontStyle.italic : FontStyle.normal,
             ),
           ),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: controller,
-            enabled: enabled,
-            validator: validator,
-            minLines: minLines,
-            maxLines: maxLines,
-            onTap: () {
-              // not needed for org view
-              // if (type == 'date') {
-              //   _showDatePicker(context, controller);
-              // } else if (type == 'time') {
-              //   _showTimePicker(context, controller);
-              // }
-            },
-            style: const TextStyle(color: Colors.black),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.grey[100],
-              labelText: label,
-              floatingLabelBehavior: FloatingLabelBehavior.never,
-              alignLabelWithHint: true,
-              suffixIcon: suffixIcon,
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(8.0)),
-              ),
-              enabledBorder: const OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Colors.grey,
-                  width: 1.0,
-                ),
-                borderRadius: BorderRadius.all(Radius.circular(8.0)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 2.0,
-                ),
-                borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-              ),
-              disabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(
-                  color: Colors.grey.shade400,
-                  width: 1.0,
-                ),
-                borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-              ),
-            ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImageContainer(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    if (_photoDownloadURL == '') {
+      return Center(
+        child: Text(
+          'No image available',
+          style: TextStyle(
+            fontStyle: FontStyle.italic,
+            color: colorScheme.onSurface.withValues(alpha: 0.4),
           ),
-        ],
+        ),
+      );
+    }
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ShowFullImage(image: _photoDownloadURL),
+          ),
+        );
+      },
+      child: Container(
+        height: 200,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          image: DecorationImage(
+            image: StorageConfig.useFirebaseStorage
+                ? NetworkImage(_photoDownloadURL)
+                : MemoryImage(base64Decode(_photoDownloadURL)) as ImageProvider,
+            fit: BoxFit.cover,
+          ),
+        ),
       ),
     );
   }
@@ -486,220 +555,179 @@ class OrgDonationFormPageState extends State<OrgDonationFormPage> {
       onPressed = () => _startQrScan();
     }
 
+    final colorScheme = Theme.of(context).colorScheme;
+    final donation = _selectedDonation!;
+
     return Scaffold(
       appBar: AppBar(
-          title: Text(
-        "View Donation Details",
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary,
+        title: Text(
+          "View Donation Details",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.primary,
+          ),
         ),
-      )),
-      body: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(children: [
-            Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Categories',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      ..._categories.map((option) {
-                        return CheckboxListTile(
-                          enabled: !isViewMode,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: Text(option),
-                          value: _categories.contains(option),
-                          onChanged: (newValue) {
-                            setState(() {
-                              if (newValue!) {
-                                _categories.add(option);
-                              } else {
-                                _categories.remove(option);
-                              }
-                            });
-                          },
-                        );
-                      }).toList()
-                    ])),
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: _buildFormField(
-                    context: context,
-                    type: 'number',
-                    label: 'Weight',
-                    controller: _weightController,
-                    enabled: !isViewMode,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter weight';
-                      }
-                      return null;
-                    },
-                  ),
+        iconTheme: IconThemeData(color: colorScheme.primary),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(16.0),
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.shadow.withValues(alpha: 0.1),
+                  spreadRadius: 0,
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 1,
-                  child: DropdownButtonFormField<String>(
-                    value: _weightUnit,
-                    onChanged: isViewMode
-                        ? null
-                        : (newValue) {
-                            setState(() {
-                              _weightUnit = newValue!;
-                            });
-                          },
-                    items: <String>['kg', 'lbs'].map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(width: 16),
               ],
+              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Mode of Transfer',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  RadioListTile<String>(
-                    title: const Text('Pick-up'),
-                    value: 'Pick-up',
-                    groupValue: _mode,
-                    onChanged: isViewMode
-                        ? null
-                        : (value) {
-                            setState(() {
-                              _mode = value as String;
-                            });
-                          },
-                  ),
-                  RadioListTile<String>(
-                    title: const Text('Drop-off'),
-                    value: 'Drop-off',
-                    groupValue: _mode,
-                    onChanged: isViewMode
-                        ? null
-                        : (value) {
-                            setState(() {
-                              _mode = value as String;
-                            });
-                          },
-                  ),
-                ],
-              ),
-            ),
-            if (_mode == 'Pick-up') ...[
-              ..._addressControllers.map((controller) {
-                final int index = _addressControllers.indexOf(controller);
-                return Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Stack(
                   children: [
-                    Expanded(
-                      child: _buildFormField(
-                        context: context,
-                        type: 'text',
-                        label: 'Address ${index + 1}',
-                        controller: controller,
-                        enabled: !isViewMode,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter an address';
-                          }
-                          return null;
-                        },
-                        minLines: 1,
-                        maxLines: null,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        _buildAvatar(context),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Donor:',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4),
+                                child: Text(
+                                  _donorName,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: _buildStatusBadge(donation.status),
                     ),
                   ],
-                );
-              }).toList(),
-              _buildFormField(
-                context: context,
-                type: 'text',
-                label: 'Contact Number',
-                controller: _contactNumController,
-                enabled: !isViewMode,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter contact number';
-                  }
-                  return null;
-                },
-              ),
-            ],
-            _buildFormField(
-              context: context,
-              type: 'date',
-              label: 'Date of Pick-up/Drop-off',
-              controller: _dateController,
-              enabled: !isViewMode,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter date of pick-up/drop-off';
-                }
-                return null;
-              },
-              minLines: 1,
-              suffixIcon: const Icon(Icons.calendar_today),
+                ),
+                const SizedBox(height: 30),
+                _buildSectionLabel('Donation Drive', context),
+                const SizedBox(height: 4),
+                FutureBuilder<String?>(
+                  future: context.read<DriveProvider>().getDriveTitle(donation.driveId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const CircularProgressIndicator();
+                    } else if (snapshot.hasError) {
+                      return Text(
+                        'Error: ${snapshot.error}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      );
+                    } else if (snapshot.hasData && snapshot.data != null) {
+                      return _buildValueRow(snapshot.data!, Icons.local_offer,
+                          context: context);
+                    } else {
+                      return _buildValueRow('No Donation Drive', Icons.local_offer,
+                          context: context);
+                    }
+                  },
+                ),
+                const SizedBox(height: 15),
+                _buildSectionLabel('Categories', context),
+                const SizedBox(height: 8),
+                ...donation.categories.map((category) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _buildValueRow(category, Icons.category,
+                          context: context),
+                    )),
+                const SizedBox(height: 15),
+                if (donation.mode == 'Pick-up') ...[
+                  _buildSectionLabel('Addresses', context),
+                  const SizedBox(height: 8),
+                  ...donation.addresses.map((address) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: _buildValueRow(address, Icons.location_on,
+                            context: context),
+                      )),
+                  const SizedBox(height: 15),
+                ],
+                _buildSectionLabel('Mode', context),
+                const SizedBox(height: 4),
+                _buildValueRow(donation.mode, Icons.local_shipping,
+                    context: context),
+                const SizedBox(height: 15),
+                _buildSectionLabel('Weight', context),
+                const SizedBox(height: 4),
+                _buildValueRow('${donation.weight} ${donation.weightUnit}',
+                    Icons.scale, context: context),
+                const SizedBox(height: 15),
+                if (donation.mode == 'Pick-up') ...[
+                  _buildSectionLabel('Contact Number', context),
+                  const SizedBox(height: 4),
+                  _buildValueRow(donation.contactNum, Icons.phone,
+                      context: context),
+                  const SizedBox(height: 15),
+                ],
+                _buildSectionLabel('Date', context),
+                const SizedBox(height: 4),
+                _buildValueRow(
+                    DateFormat('MMMM dd, yyyy').format(donation.date),
+                    Icons.calendar_today,
+                    context: context),
+                const SizedBox(height: 15),
+                _buildSectionLabel('Image', context),
+                const SizedBox(height: 8),
+                _buildImageContainer(context),
+              ],
             ),
-            const SizedBox(height: 8),
-            _buildFormField(
-              context: context,
-              type: 'time',
-              label: 'Time of Pick-up/Drop-off',
-              controller: _timeController,
-              enabled: !isViewMode,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter time of pick-up/drop-off';
-                }
-                return null;
-              },
-              minLines: 1,
-              suffixIcon: const Icon(Icons.access_time),
-            ),
-            const SizedBox(height: 8),
-            _buildImageContainer(),
-            const SizedBox(height: 8),
-            if (_status != 'completed' && _status != 'cancelled')
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: onPressed,
-                    style: ElevatedButton.styleFrom(
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                    ),
-                    child: Text(buttonText),
+          ),
+          const SizedBox(height: 16),
+          if (_status != 'completed' && _status != 'cancelled')
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onPressed,
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: colorScheme.onPrimary,
+                    backgroundColor: colorScheme.primary,
                   ),
+                  child: Text(buttonText),
                 ),
               ),
-          ]),
-        ),
+            ),
+          const SizedBox(height: 50),
+        ],
       ),
     );
   }

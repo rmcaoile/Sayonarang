@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/donate_data.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:donation_app/storage_config.dart';
 
 class FirebaseDonorAPI {
   static final FirebaseFirestore db = FirebaseFirestore.instance;
@@ -74,14 +75,18 @@ class FirebaseDonorAPI {
     }
   }
 
-  Future<String?> getImageUrl(String filename) async {
-    try {
-      final storageRef = FirebaseStorage.instance.ref();
-      final imageRef = storageRef.child("images/$filename");
-      return await imageRef.getDownloadURL();
-    } catch (e) {
-      print("Failed to retrieve image: $e");
-      return null;
+  Future<String?> getImageUrl(String photo) async {
+    if (StorageConfig.useFirebaseStorage) {
+      try {
+        final storageRef = FirebaseStorage.instance.ref();
+        final imageRef = storageRef.child("images/$photo");
+        return await imageRef.getDownloadURL();
+      } catch (e) {
+        print("Failed to retrieve image: $e");
+        return null;
+      }
     }
+    // base64 string stored in Firestore; return as-is
+    return photo;
   }
 }

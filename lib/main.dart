@@ -63,6 +63,10 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: colorScheme,
         useMaterial3: true,
+        appBarTheme: AppBarTheme(
+          backgroundColor:
+              const Color(0xFFF54741).withValues(alpha: 0.12),
+        ),
       ),
       // initialRoute: '/org',
       routes: {

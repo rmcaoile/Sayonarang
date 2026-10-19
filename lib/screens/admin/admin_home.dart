@@ -35,7 +35,6 @@ class AdminView extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: Colors.white,
       ),
       body: _AdminScreens.elementAt(provider.selectedIndex),
       bottomNavigationBar: BottomNavigationBar(

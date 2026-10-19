@@ -2,6 +2,8 @@ import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:convert';
+import '../../storage_config.dart';
 
 class SliderShowFullmages extends StatefulWidget {
   final List<dynamic> listImagesModel;
@@ -48,7 +50,11 @@ class _SliderShowFullmagesState extends State<SliderShowFullmages> {
                 final dynamic image = widget.listImagesModel[index];
                 ImageProvider<Object>? imageProvider;
                 if (image is String) {
-                  imageProvider = NetworkImage(image);
+                  if (StorageConfig.useFirebaseStorage) {
+                    imageProvider = NetworkImage(image);
+                  } else {
+                    imageProvider = MemoryImage(base64Decode(image));
+                  }
                 } else if (image is File) {
                   imageProvider = FileImage(image);
                 }

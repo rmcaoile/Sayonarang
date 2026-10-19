@@ -4,6 +4,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:donation_app/api/firebase_user_api.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
+import 'package:donation_app/utils/image_compression.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:donation_app/models/user_model.dart' as user_model;
 
@@ -90,21 +93,29 @@ class MyAuthProvider with ChangeNotifier {
 
   Future<String> uploadFile(File file) async {
     try {
-      // get reference to firebase storage
-      final storageRef = FirebaseStorage.instance.ref();
+      if (StorageConfig.useFirebaseStorage) {
+        // get reference to firebase storage
+        final storageRef = FirebaseStorage.instance.ref();
 
-      // get filename of the image
-      final fileName = file.path.split("/").last;
-      final timestamp = DateTime.now().microsecondsSinceEpoch;
+        // get filename of the image
+        final fileName = file.path.split("/").last;
+        final timestamp = DateTime.now().microsecondsSinceEpoch;
 
-      // define the path in the storage
-      final uploadRef = storageRef.child("proof/$timestamp-$fileName");
-      await uploadRef.putFile(file);
-      print('Successfully uploaded file');
-      return '$timestamp-$fileName';
+        // define the path in the storage
+        final uploadRef = storageRef.child("proof/$timestamp-$fileName");
+        await uploadRef.putFile(file);
+        print('Successfully uploaded file');
+        return '$timestamp-$fileName';
+      }
+
+      // base64 in Firestore
+      final compressedBytes = await ImageCompressionUtil.compressImage(file);
+      final base64Image = base64Encode(compressedBytes);
+      print('Successfully compressed and converted file to base64');
+      return base64Image;
     } catch (e) {
       print(e);
-      return 'error';
+      return '';
     }
   }
 
@@ -142,9 +153,10 @@ class MyAuthProvider with ChangeNotifier {
     List<String> addresses,
     String contactNum,
     bool isOpen,
+    String? profileImageUrl,
   ) async {
     String message = await authService.editOrgDetails(
-        userId, description, addresses, contactNum, isOpen);
+        userId, description, addresses, contactNum, isOpen, profileImageUrl);
     print(message);
     notifyListeners();
   }
@@ -159,6 +171,24 @@ class MyAuthProvider with ChangeNotifier {
       return await authService.getUserById(userId);
     } catch (e) {
       throw Exception("Failed to retrieve user: ${e.toString()}");
+    }
+  }
+
+  Future<String> updateDonorProfile(
+    String userId,
+    String name,
+    String username,
+    String contactNum,
+    List<String> addresses,
+    String? profileImageUrl,
+  ) async {
+    try {
+      String message = await authService.updateDonorProfile(
+          userId, name, username, contactNum, addresses, profileImageUrl);
+      notifyListeners();
+      return message;
+    } catch (e) {
+      throw Exception("Failed to update donor profile: ${e.toString()}");
     }
   }
 }

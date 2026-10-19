@@ -1,7 +1,8 @@
 import 'package:donation_app/models/donation_model.dart';
 import 'package:donation_app/providers/donation_provider.dart';
+import 'package:donation_app/providers/drive_provider.dart';
 import 'package:donation_app/providers/user_provider.dart';
-import 'package:donation_app/screens/donor_new/donor_drive_form.dart';
+import 'package:donation_app/screens/donor_new/donor_drive_details.dart';
 import 'package:donation_app/screens/donor_new/donor_qrcode.dart';
 import 'package:donation_app/screens/shared/image_viewer.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,8 +10,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'package:donation_app/storage_config.dart';
 import "package:firebase_auth/firebase_auth.dart";
 import "package:donation_app/models/user_model.dart" as user_model;
+import "package:donation_app/models/drive_model.dart" as drive_model;
 
 // TODO: Add loading state for saving and loading image
 // TODO: Show details of organization before donating
@@ -44,6 +48,8 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
 
   Donation? _selectedDonation;
   user_model.User? _selectedOrg;
+  String _orgName = 'Organization';
+  String? _orgProfileImageUrl;
   bool get isViewMode => widget.mode == 'view';
   final _formKey = GlobalKey<FormState>();
 
@@ -76,6 +82,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
       _timestamp = _selectedDonation!.timestamp;
 
       _loadDownloadURLs();
+      _loadOrgDetails();
     } else {
       // only fetch selected organization when creating a new donation
       _selectedOrg = context.read<MyAuthProvider>().selected;
@@ -112,14 +119,38 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
   Future<void> _loadDownloadURLs() async {
     if (widget.mode == "edit" || widget.mode == "view") {
       if (_photo != '') {
-        String downloadURL = await context
-            .read<DonationProvider>()
-            .fetchDownloadURLForImage(_photo);
-        setState(() {
-          _photoDownloadURL = downloadURL;
-        });
+        if (StorageConfig.useFirebaseStorage) {
+          final downloadURL = await context
+              .read<DonationProvider>()
+              .fetchDownloadURLForImage(_photo);
+          setState(() {
+            _photoDownloadURL = downloadURL;
+          });
+        } else {
+          try {
+            base64Decode(_photo);
+            setState(() {
+              _photoDownloadURL = _photo;
+            });
+          } catch (e) {
+            print('Invalid base64 image data: $e');
+          }
+        }
       }
     }
+  }
+
+  Future<void> _loadOrgDetails() async {
+    try {
+      final details = await context
+          .read<MyAuthProvider>()
+          .getUserDetails(_selectedDonation!.orgId);
+      if (!mounted) return;
+      setState(() {
+        _orgName = details['name'] as String? ?? 'Organization';
+        _orgProfileImageUrl = details['profileImageUrl'] as String?;
+      });
+    } catch (_) {}
   }
 
   Future<void> _pickImageFromGallery() async {
@@ -247,12 +278,44 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
     }
   }
 
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending': return Colors.orange;
+      case 'confirmed': return Colors.blue;
+      case 'scheduled for pick-up': return Colors.purple;
+      case 'completed': return Colors.green;
+      case 'cancelled': return Colors.grey;
+      default: return Colors.black;
+    }
+  }
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'scheduled for pick-up': return 'Scheduled';
+      default: return status[0].toUpperCase() + status.substring(1);
+    }
+  }
+  String _getInitials(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    final first = words.isNotEmpty ? words.first : '';
+    final second = words.length > 1 ? words[1] : '';
+    return ((first.isNotEmpty ? first[0] : '') + (second.isNotEmpty ? second[0] : '')).toUpperCase();
+  }
+  ImageProvider? _getOrgImageProvider() {
+    final url = _orgProfileImageUrl;
+    if (url == null || url.isEmpty) return null;
+    if (StorageConfig.useFirebaseStorage) return NetworkImage(url);
+    return MemoryImage(base64Decode(url));
+  }
+
   Widget _buildImageContainer() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: isViewMode
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 16.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!isViewMode)
           const Text(
             "Image (optional)",
             style: TextStyle(
@@ -260,78 +323,80 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
               fontSize: 18,
             ),
           ),
-          const SizedBox(height: 8),
-          if (_photoDownloadURL != '' || _selectedPhoto != null)
-            Stack(
-              children: [
-                InkWell(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => ShowFullImage(
-                          image: _photoDownloadURL != ''
-                              ? _photoDownloadURL
-                              : _selectedPhoto,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      image: DecorationImage(
+        const SizedBox(height: 8),
+        if (_photoDownloadURL != '' || _selectedPhoto != null)
+          Stack(
+            children: [
+              InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ShowFullImage(
                         image: _photoDownloadURL != ''
-                            ? NetworkImage(_photoDownloadURL)
-                            : FileImage(_selectedPhoto!)
-                                as ImageProvider<Object>,
-                        fit: BoxFit.cover,
+                            ? _photoDownloadURL
+                            : _selectedPhoto,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    image: DecorationImage(
+                      image: _photoDownloadURL != ''
+                          ? (StorageConfig.useFirebaseStorage
+                              ? NetworkImage(_photoDownloadURL)
+                              : MemoryImage(base64Decode(_photoDownloadURL))
+                                  as ImageProvider<Object>)
+                          : FileImage(_selectedPhoto!) as ImageProvider<Object>,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+              ),
+              if (!isViewMode)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _photo = '';
+                        _deletedPhoto = _photoDownloadURL;
+                        _photoDownloadURL = '';
+                        _selectedPhoto = null;
+                      });
+                    },
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.red,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
                       ),
                     ),
                   ),
                 ),
-                if (!isViewMode)
-                  Positioned(
-                    top: 4,
-                    right: 4,
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _photo = '';
-                          _deletedPhoto = _photoDownloadURL;
-                          _photoDownloadURL = '';
-                          _selectedPhoto = null;
-                        });
-                      },
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.red,
-                        ),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+            ],
+          ),
+        if (_photoDownloadURL == '' && _selectedPhoto == null)
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12.0),
+              color: Colors.grey[200],
             ),
-          if (_photoDownloadURL == '' && _selectedPhoto == null)
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12.0),
-                color: Colors.grey[200],
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.image,
-                  color: Colors.grey[400],
-                  size: 48,
-                ),
+            child: Center(
+              child: Icon(
+                Icons.image,
+                color: Colors.grey[400],
+                size: 48,
               ),
             ),
+          ),
         ],
       ),
     );
@@ -475,10 +540,12 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
           ),
         )),
         body: SingleChildScrollView(
+          padding: isViewMode ? const EdgeInsets.all(16.0) : EdgeInsets.zero,
           child: Form(
             key: _formKey,
             child: Column(
               children: [
+                if (!isViewMode)
                 Padding(
                     padding:
                         const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -603,6 +670,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                               );
                             }).toList()
                         ])),
+                if (!isViewMode)
                 Row(
                   children: [
                     Expanded(
@@ -644,6 +712,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                     const SizedBox(width: 16),
                   ],
                 ),
+                if (!isViewMode)
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -684,7 +753,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                     ],
                   ),
                 ),
-                if (_mode == 'Pick-up') ...[
+                if (!isViewMode && _mode == 'Pick-up') ...[
                   ..._addressControllers.map((controller) {
                     final int index = _addressControllers.indexOf(controller);
                     return Row(
@@ -745,6 +814,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                     },
                   ),
                 ],
+                if (!isViewMode)
                 _buildFormField(
                   context: context,
                   type: 'date',
@@ -761,6 +831,7 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                   suffixIcon: const Icon(Icons.calendar_today),
                 ),
                 const SizedBox(height: 8),
+                if (!isViewMode)
                 _buildFormField(
                   context: context,
                   type: 'time',
@@ -933,7 +1004,100 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                   ),
                 ],
                 if (isViewMode) ...[
-                  _buildImageContainer(),
+                  Builder(builder: (context) {
+                    final colorScheme = Theme.of(context).colorScheme;
+                    final donation = _selectedDonation!;
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16.0),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.shadow.withValues(alpha: 0.1),
+                            spreadRadius: 0,
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Stack(
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 52,
+                                    backgroundColor: colorScheme.primary,
+                                    backgroundImage: _getOrgImageProvider(),
+                                    child: _getOrgImageProvider() == null
+                                        ? Text(_getInitials(_orgName), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white))
+                                        : null,
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text('Organization:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                                        const SizedBox(height: 4),
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 4),
+                                          child: Text(_orgName, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface), overflow: TextOverflow.ellipsis),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(color: _getStatusColor(donation.status), borderRadius: BorderRadius.circular(64)),
+                                  child: Text(_getStatusLabel(donation.status), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 30),
+                          Text('Categories', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 8),
+                          ...donation.categories.map((c) => Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(children: [Icon(Icons.category, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text(c, style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]))),
+                          const SizedBox(height: 15),
+                          Text('Mode', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 4),
+                          Row(children: [Icon(Icons.local_shipping, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text(donation.mode, style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]),
+                          const SizedBox(height: 15),
+                          Text('Weight', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 4),
+                          Row(children: [Icon(Icons.scale, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text('${donation.weight} ${donation.weightUnit}', style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]),
+                          const SizedBox(height: 15),
+                          if (donation.mode == 'Pick-up') ...[
+                            Text('Contact Number', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                            const SizedBox(height: 4),
+                            Row(children: [Icon(Icons.phone, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text(donation.contactNum, style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]),
+                            const SizedBox(height: 15),
+                          ],
+                          Text('Date', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 4),
+                          Row(children: [Icon(Icons.calendar_today, size: 18, color: colorScheme.onSurface.withValues(alpha: 0.5)), const SizedBox(width: 8), Expanded(child: Text(DateFormat('MMMM dd, yyyy').format(donation.date), style: TextStyle(fontSize: 16, color: colorScheme.onSurface)))]),
+                          const SizedBox(height: 15),
+                          Text('Image', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface.withValues(alpha: 0.6))),
+                          const SizedBox(height: 8),
+                          _buildImageContainer(),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 16),
                   if (_mode == 'Drop-off')
                     Padding(
                       padding: const EdgeInsets.symmetric(
@@ -1051,19 +1215,63 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
                     ),
                   const SizedBox(height: 8),
                   // only show donation drive when status is not pending or cancelled
-                  if (_status != 'pending' && _status != 'cancelled') ...[
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  DonorDriveFormPage(mode: 'view')),
-                        );
-                      },
-                      child: const Text('Where is my donation going?'),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
+                    if (_status != 'pending' && _status != 'cancelled') ...[
+                      TextButton(
+                        onPressed: () async {
+                          try {
+                            if (_selectedDonation?.driveId == null ||
+                                _selectedDonation!.driveId!.isEmpty) {
+                              return;
+                            }
+
+                            final driveDoc = await context
+                                .read<DriveProvider>()
+                                .getDriveById(_selectedDonation!.driveId!);
+
+                            if (driveDoc.exists) {
+                              final drive = driveDoc.data() as Map<String, dynamic>;
+                              final orgDoc = await context
+                                  .read<MyAuthProvider>()
+                                  .getUserById(drive['orgId']);
+
+                              if (orgDoc.exists && context.mounted) {
+                                final org = orgDoc.data() as Map<String, dynamic>;
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => DonorDriveDetailsPage(
+                                      drive: drive_model.Drive.fromJson(
+                                        drive,
+                                      ),
+                                      userName: org['name'] ?? 'Organization',
+                                      profileImageUrl: org['profileImageUrl'],
+                                      status: org['status'] ?? '',
+                                      showDonateButton: false,
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Drive details not found'),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          }
+                        },
+                        child: const Text('Where is my donation going?'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                 ]
               ],
             ),

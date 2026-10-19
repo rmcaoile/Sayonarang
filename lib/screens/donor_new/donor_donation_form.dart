@@ -308,7 +308,11 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
   }
 
   Widget _buildImageContainer() {
-    return Column(
+    return Padding(
+      padding: isViewMode
+          ? EdgeInsets.zero
+          : const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (!isViewMode)
@@ -393,7 +397,8 @@ class DonorDonationFormPageState extends State<DonorDonationFormPage> {
               ),
             ),
           ),
-      ],
+        ],
+      ),
     );
   }
 
